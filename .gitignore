@@ -8,3 +8,4 @@ omy_pnp
 wandb
 omy_pnp_language
 myenv
+mujoco_env/__pycache__
