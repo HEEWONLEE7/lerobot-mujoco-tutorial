@@ -28,19 +28,26 @@ class SimpleEnv:
         self.action_type = action_type
         self.state_type = state_type
 
-        self.joint_names_l = [
-            'arm_l_joint1','arm_l_joint2','arm_l_joint3',
-            'arm_l_joint4','arm_l_joint5','arm_l_joint6','arm_l_joint7'
-        ]
-
-        self.joint_names_r = [
-            'arm_r_joint1','arm_r_joint2','arm_r_joint3',
-            'arm_r_joint4','arm_r_joint5','arm_r_joint6','arm_r_joint7'
-        ]
-
-        self.joint_names_extra = [
-            'lift_joint','head_joint1','head_joint2'
-        ]
+        self.joint_names_l = ['arm_l_joint1',
+                    'arm_l_joint2',
+                    'arm_l_joint3',
+                    'arm_l_joint4',
+                    'arm_l_joint5',
+                    'arm_l_joint6',
+                    'arm_l_joint7']
+        
+        self.joint_names_r = ['arm_r_joint1',
+                    'arm_r_joint2',
+                    'arm_r_joint3',
+                    'arm_r_joint4',
+                    'arm_r_joint5',
+                    'arm_r_joint6',
+                    'arm_r_joint7']
+        
+        self.joint_names_extra = ['lift_joint',
+                    'head_joint1',
+                    'head_joint2']
+        
         self.init_viewer()
         self.reset(seed)
 
@@ -66,28 +73,28 @@ class SimpleEnv:
         q_init_l = np.deg2rad([0,0,0,0,0,0,0])
         q_init_r = np.deg2rad([0,0,0,0,0,0,0])
         q_init_extra = np.deg2rad([0,0,0])
-
-        q_zero_l, ik_err_stack, ik_info = solve_ik(
-            env=self.env,
-            joint_names_for_ik=self.joint_names_l,
-            body_name_trgt='arm_l_link7',
-            q_init=q_init_l,
-            p_trgt=np.array([0.3, 0.0, 1.0]),
-            R_trgt=rpy2r(np.deg2rad([90, 0, 90])),
+        
+        q_zero_l,ik_err_stack,ik_info = solve_ik(
+            env = self.env,
+            joint_names_for_ik = self.joint_names_l,
+            body_name_trgt     = 'tcp_l_link',
+            q_init       = q_init_l,
+            p_trgt       = np.array([0.3,0.0,1.0]),
+            R_trgt       = rpy2r(np.deg2rad([90,-0.,90 ])),
         )
-
-        q_zero_r, ik_err_stack, ik_info = solve_ik(
-            env=self.env,
-            joint_names_for_ik=self.joint_names_r,
-            body_name_trgt='arm_r_link7',
-            q_init=q_init_r,
-            p_trgt=np.array([0.3, 0.0, 1.0]),
-            R_trgt=rpy2r(np.deg2rad([90, 0, 90])),
+        
+        q_zero_r,ik_err_stack,ik_info = solve_ik(
+            env = self.env,
+            joint_names_for_ik = self.joint_names_r,
+            body_name_trgt     = 'tcp_r_link',
+            q_init       = q_init_r,
+            p_trgt       = np.array([0.3,0.0,1.0]),
+            R_trgt       = rpy2r(np.deg2rad([90,-0.,90 ])),
         )
-
-        self.env.forward(q=q_zero_l, joint_names=self.joint_names_l, increase_tick=False)
-        self.env.forward(q=q_zero_r, joint_names=self.joint_names_r, increase_tick=False)
-        self.env.forward(q=q_init_extra, joint_names=self.joint_names_extra, increase_tick=False)
+        
+        self.env.forward(q=q_zero_l,joint_names=self.joint_names_l,increase_tick=False)
+        self.env.forward(q=q_zero_r,joint_names=self.joint_names_r,increase_tick=False)
+        self.env.forward(q=q_init_extra,joint_names=self.joint_names_extra,increase_tick=False)
 
         # Set object positions
         obj_names = self.env.get_body_names(prefix='body_obj_')
@@ -109,103 +116,98 @@ class SimpleEnv:
         self.last_q_l = copy.deepcopy(q_zero_l)
         self.last_q_r = copy.deepcopy(q_zero_r)
         self.last_q_extra = copy.deepcopy(q_init_extra)
+        
         self.q_l = np.concatenate([q_zero_l, np.array([0.0]*4)])
         self.q_r = np.concatenate([q_zero_r, np.array([0.0]*4)])
         self.q_extra = q_init_extra
-        self.p0_l, self.R0_l = self.env.get_pR_body(body_name='arm_base_link')
-        self.p0_r, self.R0_r = self.env.get_pR_body(body_name='arm_base_link')
+        
+        self.p0_l, self.R0_l = self.env.get_pR_body(body_name='tcp_l_link')
+        self.p0_r, self.R0_r = self.env.get_pR_body(body_name='tcp_r_link')
+        
         mug_init_pose, plate_init_pose = self.get_obj_pose()
         self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
         for _ in range(100):
             self.step_env()
         print("DONE INITIALIZATION")
-        self.gripper_state = False
-        self.past_chars = []
+        self.gripper_l = False
+        self.gripper_r = False
 
     def step(self, action_l, action_r):
         '''
         Take a step in the environment
         args:
-            action: np.array of shape (7,), action to take
+            action_l: np.array of shape (8,), left arm action
+            action_r: np.array of shape (8,), right arm action
         returns:
-            state: np.array, state of the environment after taking the action
-                - ee_pose: [px,py,pz,r,p,y]
-                - joint_angle: [j1,j2,j3,j4,j5,j6]
-
+            state_l, state_r: np.array, state of both arms
         '''
         if self.action_type == 'eef_pose':
-            q_l = self.env.get_qpos_joints(self.joint_names_l)
+            q_l = self.env.get_qpos_joints(joint_names=self.joint_names_l)
             self.p0_l += action_l[:3]
             self.R0_l = self.R0_l.dot(rpy2r(action_l[3:6]))
-
-            q_l, ik_err_stack, ik_info = solve_ik(
-                env=self.env,
-                joint_names_for_ik=self.joint_names_l,
-                body_name_trgt='arm_l_link7',
-                q_init=q_l,
-                p_trgt=self.p0_l,
-                R_trgt=self.R0_l,
-                max_ik_tick=50,
-                ik_stepsize=1.0,
-                ik_eps=1e-2,
-                ik_th=np.radians(5),
-                render=False,
-                verbose_warning=False,
+            q_l ,ik_err_stack,ik_info = solve_ik(
+                env                = self.env,
+                joint_names_for_ik = self.joint_names_l,
+                body_name_trgt     = 'tcp_l_link',
+                q_init             = q_l,
+                p_trgt             = self.p0_l,
+                R_trgt             = self.R0_l,
+                max_ik_tick        = 50,
+                ik_stepsize        = 1.0,
+                ik_eps             = 1e-2,
+                ik_th              = np.radians(5.0),
+                render             = False,
+                verbose_warning    = False,
             )
         elif self.action_type == 'delta_joint_angle':
             q_l = action_l[:-1] + self.last_q_l
         elif self.action_type == 'joint_angle':
             q_l = action_l[:-1]
-        else:
-            raise ValueError('action_type not recognized')
         
         if self.action_type == 'eef_pose':
-            q_r = self.env.get_qpos_joints(self.joint_names_r)
+            q_r = self.env.get_qpos_joints(joint_names=self.joint_names_r)
             self.p0_r += action_r[:3]
             self.R0_r = self.R0_r.dot(rpy2r(action_r[3:6]))
-
-            q_r, ik_err_stack, ik_info = solve_ik(
-                env=self.env,
-                joint_names_for_ik=self.joint_names_r,
-                body_name_trgt='arm_r_link7',
-                q_init=q_r,
-                p_trgt=self.p0_r,
-                R_trgt=self.R0_r,
-                max_ik_tick=50,
-                ik_stepsize=1.0,
-                ik_eps=1e-2,
-                ik_th=np.radians(5),
-                render=False,
-                verbose_warning=False,
+            q_r ,ik_err_stack,ik_info = solve_ik(
+                env                = self.env,
+                joint_names_for_ik = self.joint_names_r,
+                body_name_trgt     = 'tcp_r_link',
+                q_init             = q_r,
+                p_trgt             = self.p0_r,
+                R_trgt             = self.R0_r,
+                max_ik_tick        = 50,
+                ik_stepsize        = 1.0,
+                ik_eps             = 1e-2,
+                ik_th              = np.radians(5.0),
+                render             = False,
+                verbose_warning    = False,
             )
         elif self.action_type == 'delta_joint_angle':
             q_r = action_r[:-1] + self.last_q_r
         elif self.action_type == 'joint_angle':
             q_r = action_r[:-1]
-        else:
-            raise ValueError('action_type not recognized')
         
         gripper_cmd_l = np.array([action_l[-1]]*4)
         gripper_cmd_l[[1,3]] *= 0.8
-        self.compute_q_l = q_l
-        q_l = np.concatenate([q_l, gripper_cmd_l])
-
         gripper_cmd_r = np.array([action_r[-1]]*4)
         gripper_cmd_r[[1,3]] *= 0.8
+        
+        self.compute_q_l = q_l
         self.compute_q_r = q_r
+        q_l = np.concatenate([q_l, gripper_cmd_l])
         q_r = np.concatenate([q_r, gripper_cmd_r])
 
-        self.q_l = np.concatenate([q_l, gripper_cmd_l])
-        self.q_r = np.concatenate([q_r, gripper_cmd_r])
+        self.q_l = q_l
+        self.q_r = q_r
+        
         if self.state_type == 'joint_angle':
             return self.get_joint_state()
         elif self.state_type == 'ee_pose':
             return self.get_ee_pose()
         elif self.state_type == 'delta_q' or self.action_type == 'delta_joint_angle':
-            dq =  self.get_delta_q()
-            return dq
-        else:
-            raise ValueError('state_type not recognized')
+            dq_l = self.get_delta_q_l()
+            dq_r = self.get_delta_q_r()
+            return dq_l, dq_r
 
     def step_env(self):
         q_full = np.concatenate([self.q_l, self.q_r, self.q_extra])
@@ -234,10 +236,19 @@ class SimpleEnv:
         Render the environment
         '''
         self.env.plot_time()
-        p_current, R_current = self.env.get_pR_body(body_name='tcp_link')
-        R_current = R_current @ np.array([[1,0,0],[0,0,1],[0,1,0 ]])
-        self.env.plot_sphere(p=p_current, r=0.02, rgba=[0.95,0.05,0.05,0.5])
-        self.env.plot_capsule(p=p_current, R=R_current, r=0.01, h=0.2, rgba=[0.05,0.95,0.05,0.5])
+        p_current_l, R_current_l = self.env.get_pR_body(body_name='tcp_l_link')
+        p_current_r, R_current_r = self.env.get_pR_body(body_name='tcp_r_link')
+        
+        # 왼팔 TCP 시각화
+        R_current_l = R_current_l @ np.array([[1,0,0],[0,0,1],[0,1,0]])
+        self.env.plot_sphere(p=p_current_l, r=0.02, rgba=[0.95,0.05,0.05,0.5])
+        self.env.plot_capsule(p=p_current_l, R=R_current_l, r=0.01, h=0.2, rgba=[0.05,0.95,0.05,0.5])
+        
+        # 오른팔 TCP 시각화
+        R_current_r = R_current_r @ np.array([[1,0,0],[0,0,1],[0,1,0]])
+        self.env.plot_sphere(p=p_current_r, r=0.02, rgba=[0.05,0.05,0.95,0.5])
+        self.env.plot_capsule(p=p_current_r, R=R_current_r, r=0.01, h=0.2, rgba=[0.05,0.05,0.95,0.5])
+        
         rgb_egocentric_view = add_title_to_img(self.rgb_ego,text='Egocentric View',shape=(640,480))
         rgb_agent_view = add_title_to_img(self.rgb_agent,text='Agent View',shape=(640,480))
         
@@ -252,24 +263,27 @@ class SimpleEnv:
 
     def get_joint_state(self):
         '''
-        Get the joint state of the robot
+        Get the joint state of both arms
         returns:
-            q: np.array, joint angles of the robot + gripper state (0 for open, 1 for closed)
-            [j1,j2,j3,j4,j5,j6,gripper]
+            state_l, state_r: joint angles + gripper state
         '''
-        qpos = self.env.get_qpos_joints(joint_names=self.joint_names)
-        gripper = self.env.get_qpos_joint('rh_r1')
-        gripper_cmd = 1.0 if gripper[0] > 0.5 else 0.0
-        return np.concatenate([qpos, [gripper_cmd]],dtype=np.float32)
+        qpos_l = self.env.get_qpos_joints(joint_names=self.joint_names_l)
+        qpos_r = self.env.get_qpos_joints(joint_names=self.joint_names_r)
+        gripper_l = self.env.get_qpos_joint('gripper_l_joint1')
+        gripper_r = self.env.get_qpos_joint('gripper_r_joint1')
+        gripper_cmd_l = 1.0 if gripper_l[0] > 0.5 else 0.0
+        gripper_cmd_r = 1.0 if gripper_r[0] > 0.5 else 0.0
+        return np.concatenate([qpos_l, [gripper_cmd_l]],dtype=np.float32), np.concatenate([qpos_r, [gripper_cmd_r]],dtype=np.float32)
     
     def teleop_robot(self):
         '''
         Teleoperate the robot using keyboard
         returns:
-            action: np.array, action to take
+            action_l, action_r: np.array, action to take
             done: bool, True if the user wants to reset the teleoperation
         
         Keys:
+            LEFT/RIGHT ARM (WASD + RF):
             ---------     -----------------------
                w       ->        backward
             s  a  d        left   forward   right
@@ -286,22 +300,45 @@ class SimpleEnv:
             Q: Tilt left
             E: Tilt right
             UP: Look Upward
-            Down: Look Donward
+            Down: Look Downward
             Right: Turn right
             Left: Turn left
             ---------
             For rotation
 
+            LIFT CONTROL (V/B):
+            V: lift up
+            B: lift down
+
+            HEAD CONTROL (N/M + comma/period):
+            N: head_joint1 +
+            M: head_joint1 -
+            ,: head_joint2 +
+            .: head_joint2 -
+
             ---------
+            TAB: Switch control arm
             z: reset
             SPACEBAR: gripper open/close
             ---------   
-
-
         '''
-        # char = self.env.get_key_pressed()
+        # 팔 전환 상태 변수 초기화
+        if not hasattr(self, 'control_arm'):
+            self.control_arm = 'left'
+            self.gripper_state = False
+
+        # 팔 전환
+        if self.env.is_key_pressed_once(key=glfw.KEY_TAB):
+            self.control_arm = 'right' if self.control_arm == 'left' else 'left'
+            print(f"Switched to {self.control_arm.upper()} arm")
+
         dpos = np.zeros(3)
         drot = np.eye(3)
+        d_lift = 0.0
+        d_head1 = 0.0
+        d_head2 = 0.0
+
+        # ARM 움직임
         if self.env.is_key_pressed_repeat(key=glfw.KEY_S):
             dpos += np.array([0.007,0.0,0.0])
         if self.env.is_key_pressed_repeat(key=glfw.KEY_W):
@@ -314,6 +351,8 @@ class SimpleEnv:
             dpos += np.array([0.0,0.0,0.007])
         if self.env.is_key_pressed_repeat(key=glfw.KEY_F):
             dpos += np.array([0.0,0.0,-0.007])
+
+        # ARM 회전
         if  self.env.is_key_pressed_repeat(key=glfw.KEY_LEFT):
             drot = rotation_matrix(angle=0.1 * 0.3, direction=[0.0, 1.0, 0.0])[:3, :3]
         if  self.env.is_key_pressed_repeat(key=glfw.KEY_RIGHT):
@@ -326,37 +365,74 @@ class SimpleEnv:
             drot = rotation_matrix(angle=0.1 * 0.3, direction=[0.0, 0.0, 1.0])[:3, :3]
         if self.env.is_key_pressed_repeat(key=glfw.KEY_E):
             drot = rotation_matrix(angle=-0.1 * 0.3, direction=[0.0, 0.0, 1.0])[:3, :3]
+
+        # LIFT 제어 (V/B)
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_V):
+            d_lift += 0.01
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_B):
+            d_lift -= 0.01
+
+        # HEAD 제어 (N/M + comma/period)
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_N):
+            d_head1 += 0.01
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_M):
+            d_head1 -= 0.01
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_COMMA):
+            d_head2 += 0.01
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_PERIOD):
+            d_head2 -= 0.01
+
+        # 그리퍼와 리셋
         if self.env.is_key_pressed_once(key=glfw.KEY_Z):
-            return np.zeros(7, dtype=np.float32), True
+            return np.zeros(8, dtype=np.float32), np.zeros(8, dtype=np.float32), True
         if self.env.is_key_pressed_once(key=glfw.KEY_SPACE):
-            self.gripper_state =  not  self.gripper_state
+            self.gripper_state = not self.gripper_state
+
+        # 액션 생성
         drot = r2rpy(drot)
-        action = np.concatenate([dpos, drot, np.array([self.gripper_state],dtype=np.float32)],dtype=np.float32)
-        return action, False
+        
+        if self.control_arm == 'left':
+            action_l = np.concatenate([dpos, drot, np.array([self.gripper_state],dtype=np.float32)],dtype=np.float32)
+            action_r = np.zeros(8, dtype=np.float32)
+        else:
+            action_l = np.zeros(8, dtype=np.float32)
+            action_r = np.concatenate([dpos, drot, np.array([self.gripper_state],dtype=np.float32)],dtype=np.float32)
+
+        # lift, head 변경사항
+        d_extra = np.array([d_lift, d_head1, d_head2], dtype=np.float32)
+        self.q_extra = np.clip(self.q_extra + d_extra, -np.pi, np.pi)
+
+        return action_l, action_r, False
     
-    def get_delta_q(self):
+    def get_delta_q_l(self):
         '''
-        Get the delta joint angles of the robot
-        returns:
-            delta: np.array, delta joint angles of the robot + gripper state (0 for open, 1 for closed)
-            [dj1,dj2,dj3,dj4,dj5,dj6,gripper]
+        Get the delta joint angles of the left arm
         '''
-        delta = self.compute_q - self.last_q
-        self.last_q = copy.deepcopy(self.compute_q)
-        gripper = self.env.get_qpos_joint('rh_r1')
+        delta = self.compute_q_l - self.last_q_l
+        self.last_q_l = copy.deepcopy(self.compute_q_l)
+        gripper = self.env.get_qpos_joint('gripper_l_joint1')
+        gripper_cmd = 1.0 if gripper[0] > 0.5 else 0.0
+        return np.concatenate([delta, [gripper_cmd]],dtype=np.float32)
+
+    def get_delta_q_r(self):
+        '''
+        Get the delta joint angles of the right arm
+        '''
+        delta = self.compute_q_r - self.last_q_r
+        self.last_q_r = copy.deepcopy(self.compute_q_r)
+        gripper = self.env.get_qpos_joint('gripper_r_joint1')
         gripper_cmd = 1.0 if gripper[0] > 0.5 else 0.0
         return np.concatenate([delta, [gripper_cmd]],dtype=np.float32)
 
     def check_success(self):
         '''
-        ['body_obj_mug_5', 'body_obj_plate_11']
         Check if the mug is placed on the plate
         + Gripper should be open and move upward above 0.9
         '''
         p_mug = self.env.get_p_body('body_obj_mug_5')
         p_plate = self.env.get_p_body('body_obj_plate_11')
-        if np.linalg.norm(p_mug[:2] - p_plate[:2]) < 0.1 and np.linalg.norm(p_mug[2] - p_plate[2]) < 0.6 and self.env.get_qpos_joint('rh_r1') < 0.1:
-            p = self.env.get_p_body('tcp_link')[2]
+        if np.linalg.norm(p_mug[:2] - p_plate[:2]) < 0.1 and np.linalg.norm(p_mug[2] - p_plate[2]) < 0.6 and self.env.get_qpos_joint('gripper_l_joint1') < 0.1:
+            p = self.env.get_p_body('tcp_l_link')[2]
             if p > 0.9:
                 return True
         return False
