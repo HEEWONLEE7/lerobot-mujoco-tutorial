@@ -130,7 +130,7 @@
                             type="box" rgba="1.00 0.00 0.0 0" />
                         <camera name="egocentric" pos="0 0 0" xyaxes="-1 0 0 0 0 1" fovy="90" />
                     </body>
-                    <body name="tcp_l_link" pos="0 0 -0.14">
+                    <body name="tcp_l_link" pos="0 0 -0.215">
                       <geom type="capsule" fromto="0 0 -0.5 0 0 0.5" size="0.01" rgba="1.0 0.2 0.2 0.0" contype="0" conaffinity="0"/>
                     </body>
 
@@ -203,7 +203,7 @@
                     <!-- Right hand base -->
                     <geom pos="0 0 -0.078" quat="0 0 1 0" type="mesh" rgba="0.2 0.2 0.2 1" mesh="base"/>
                     
-                    <body name="tcp_r_link" pos="0 0 -0.14">
+                    <body name="tcp_r_link" pos="0 0 -0.215">
                       <geom type="capsule" fromto="0 0 -0.5 0 0 0.5" size="0.01" rgba="1.0 0.2 0.2 0.0" contype="0" conaffinity="0"/>
                     </body>
                     
