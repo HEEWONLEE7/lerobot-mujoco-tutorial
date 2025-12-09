@@ -44,9 +44,9 @@ class SimpleEnv:
                     'arm_r_joint6',
                     'arm_r_joint7']
         
-        self.joint_names_extra = ['slider',
-                    'head1',
-                    'head2']
+        self.joint_names_extra = ['lift_joint',
+                    'head_joint1',
+                    'head_joint2']
         
         self.init_viewer()
         self.reset(seed)
