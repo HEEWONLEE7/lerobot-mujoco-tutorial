@@ -70,32 +70,19 @@ class SimpleEnv:
         Move the robot to a initial position, set the object positions based on the seed
         '''
         if seed != None: np.random.seed(seed=0) 
-        q_init_l = np.deg2rad([0,0,0,0,0,0,0])
-        q_init_r = np.deg2rad([0,0,0,0,0,0,0])
-        q_init_extra = np.deg2rad([0,0,0])
         
-        # ✅ 더 현실적인 초기 위치 (로봇이 쉽게 도달)
-        q_zero_l,ik_err_stack,ik_info = solve_ik(
-            env = self.env,
-            joint_names_for_ik = self.joint_names_l,
-            body_name_trgt     = 'tcp_l_link',
-            q_init       = q_init_l,
-            p_trgt=np.array([0.28, 0.15, 0.92]),   # LEFT ARM
-            R_trgt=rpy2r(np.deg2rad([180, 0, 90]))
-        )
+        # ✅ Zero Pose 직접 설정 (IK 없음)
+        q_init_l = np.deg2rad([0, 0, 0, 0, 0, 0, -90])
+        q_init_r = np.deg2rad([0, 0, 0, 0, 0, 0, -90])
+        q_init_extra = np.deg2rad([0.25, 0, 0])
         
-        q_zero_r,ik_err_stack,ik_info = solve_ik(
-            env = self.env,
-            joint_names_for_ik = self.joint_names_r,
-            body_name_trgt     = 'tcp_r_link',
-            q_init       = q_init_r,
-            p_trgt=np.array([0.28, -0.15, 0.92]),
-            R_trgt=rpy2r(np.deg2rad([180, 0, -90])),
-        )
+        # Zero Pose 사용
+        q_zero_l = q_init_l
+        q_zero_r = q_init_r
         
-        self.env.forward(q=q_zero_l,joint_names=self.joint_names_l,increase_tick=False)
-        self.env.forward(q=q_zero_r,joint_names=self.joint_names_r,increase_tick=False)
-        self.env.forward(q=q_init_extra,joint_names=self.joint_names_extra,increase_tick=False)
+        self.env.forward(q=q_zero_l, joint_names=self.joint_names_l, increase_tick=False)
+        self.env.forward(q=q_zero_r, joint_names=self.joint_names_r, increase_tick=False)
+        self.env.forward(q=q_init_extra, joint_names=self.joint_names_extra, increase_tick=False)
 
         # Set object positions
         obj_names = self.env.get_body_names(prefix='body_obj_')
@@ -232,23 +219,48 @@ class SimpleEnv:
         return self.rgb_agent, self.rgb_ego
         
 
+    def plot_world_axes(self, origin=None, axis_len=0.15):
+        '''
+        Plot XYZ axes at the origin using spheres
+        '''
+        if origin is None:
+            origin = np.array([0.0, 0.0, 0.82])
+        
+        num_points = 10
+        sphere_radius = 0.004
+        
+        # X-axis (Red)
+        for i in range(num_points):
+            p = origin + np.array([axis_len * i / num_points, 0, 0])
+            self.env.plot_sphere(p=p, r=sphere_radius, rgba=[1, 0, 0, 1.0])
+        
+        # Y-axis (Green)
+        for i in range(num_points):
+            p = origin + np.array([0, axis_len * i / num_points, 0])
+            self.env.plot_sphere(p=p, r=sphere_radius, rgba=[0, 1, 0, 1.0])
+        
+        # Z-axis (Blue)
+        for i in range(num_points):
+            p = origin + np.array([0, 0, axis_len * i / num_points])
+            self.env.plot_sphere(p=p, r=sphere_radius, rgba=[0, 0, 1, 1.0])
+
     def render(self, teleop=False):
         '''
         Render the environment
         '''
         self.env.plot_time()
+        
+        # ✅ XYZ 축 표시
+        self.plot_world_axes()
+        
         p_current_l, R_current_l = self.env.get_pR_body(body_name='tcp_l_link')
         p_current_r, R_current_r = self.env.get_pR_body(body_name='tcp_r_link')
         
         # 왼팔 TCP 시각화
-        R_current_l = R_current_l @ np.array([[1,0,0],[0,0,1],[0,1,0]])
-        self.env.plot_sphere(p=p_current_l, r=0.02, rgba=[0.95,0.05,0.05,0.5])
-        self.env.plot_capsule(p=p_current_l, R=R_current_l, r=0.01, h=0.2, rgba=[0.05,0.95,0.05,0.5])
+        self.env.plot_sphere(p=p_current_l, r=0.02, rgba=[0.95,0.05,0.05,0.8])
         
         # 오른팔 TCP 시각화
-        R_current_r = R_current_r @ np.array([[1,0,0],[0,0,1],[0,1,0]])
-        self.env.plot_sphere(p=p_current_r, r=0.02, rgba=[0.05,0.05,0.95,0.5])
-        self.env.plot_capsule(p=p_current_r, R=R_current_r, r=0.01, h=0.2, rgba=[0.05,0.05,0.95,0.5])
+        self.env.plot_sphere(p=p_current_r, r=0.02, rgba=[0.05,0.05,0.95,0.8])
         
         rgb_egocentric_view = add_title_to_img(self.rgb_ego,text='Egocentric View',shape=(640,480))
         rgb_agent_view = add_title_to_img(self.rgb_agent,text='Agent View',shape=(640,480))
@@ -335,7 +347,7 @@ class SimpleEnv:
 
         dpos = np.zeros(3)
         drot = np.eye(3)
-        d_lift = 0.0
+        d_lift = 0.2
         d_head1 = 0.0
         d_head2 = 0.0
 
