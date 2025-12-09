@@ -74,13 +74,14 @@ class SimpleEnv:
         q_init_r = np.deg2rad([0,0,0,0,0,0,0])
         q_init_extra = np.deg2rad([0,0,0])
         
+        # ✅ 더 현실적인 초기 위치 (로봇이 쉽게 도달)
         q_zero_l,ik_err_stack,ik_info = solve_ik(
             env = self.env,
             joint_names_for_ik = self.joint_names_l,
             body_name_trgt     = 'tcp_l_link',
             q_init       = q_init_l,
-            p_trgt       = np.array([0.3,0.0,1.0]),
-            R_trgt       = rpy2r(np.deg2rad([90,-0.,90 ])),
+            p_trgt=np.array([0.28, 0.15, 0.92]),   # LEFT ARM
+            R_trgt=rpy2r(np.deg2rad([180, 0, 90]))
         )
         
         q_zero_r,ik_err_stack,ik_info = solve_ik(
@@ -88,8 +89,8 @@ class SimpleEnv:
             joint_names_for_ik = self.joint_names_r,
             body_name_trgt     = 'tcp_r_link',
             q_init       = q_init_r,
-            p_trgt       = np.array([0.3,0.0,1.0]),
-            R_trgt       = rpy2r(np.deg2rad([90,-0.,90 ])),
+            p_trgt=np.array([0.28, -0.15, 0.92]),
+            R_trgt=rpy2r(np.deg2rad([180, 0, -90])),
         )
         
         self.env.forward(q=q_zero_l,joint_names=self.joint_names_l,increase_tick=False)
@@ -128,7 +129,7 @@ class SimpleEnv:
         self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
         for _ in range(100):
             self.step_env()
-        print("DONE INITIALIZATION")
+        print("✓ INITIALIZATION COMPLETE")
         self.gripper_l = False
         self.gripper_r = False
 
@@ -463,8 +464,18 @@ class SimpleEnv:
 
     def get_ee_pose(self):
         '''
-        get the end effector pose of the robot + gripper state
+        get the end effector pose of both arms
+        returns:
+            ee_pose_l, ee_pose_r: np.array, end effector pose (6,) each
         '''
-        p, R = self.env.get_pR_body(body_name='tcp_link')
-        rpy = r2rpy(R)
-        return np.concatenate([p, rpy],dtype=np.float32)
+        # 왼팔
+        p_l, R_l = self.env.get_pR_body(body_name='tcp_l_link')
+        rpy_l = r2rpy(R_l)
+        ee_pose_l = np.concatenate([p_l, rpy_l], dtype=np.float32)
+        
+        # 오른팔
+        p_r, R_r = self.env.get_pR_body(body_name='tcp_r_link')
+        rpy_r = r2rpy(R_r)
+        ee_pose_r = np.concatenate([p_r, rpy_r], dtype=np.float32)
+        
+        return ee_pose_l, ee_pose_r
