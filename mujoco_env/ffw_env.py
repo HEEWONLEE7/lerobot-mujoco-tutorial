@@ -76,7 +76,7 @@ class SimpleEnv:
         print("Right arm joints:", self.joint_names_r)
         print("Extra joints:", self.joint_names_extra)
         
-        # ✅ joint4만 -1.86으로 (ㄴ자 형태)
+        # ✅ joint4를 0으로 (XML ref=-1.86 적용됨)
         q_init_l = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         q_init_r = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         # ✅ lift는 0으로
@@ -121,7 +121,7 @@ class SimpleEnv:
         mug_init_pose, plate_init_pose = self.get_obj_pose()
         self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
         
-        # ✅ step_env()만 실행 (step() 호출 안 함)
+        # ✅ step_env()만 실행하되 Lift 고정
         for _ in range(100):
             self.step_env()
         
@@ -220,8 +220,24 @@ class SimpleEnv:
             return dq_l, dq_r
 
     def step_env(self):
-        q_full = np.concatenate([self.q_l, self.q_r, self.q_extra])
-        self.env.step(q_full)
+        '''
+        Execute one physics step
+        '''
+        # 1) 팔 관절 적용 (lift 제외, IK도 팔만 사용)
+        self.env.forward(q=self.q_l[:7], joint_names=self.joint_names_l, increase_tick=False)
+        self.env.forward(q=self.q_r[:7], joint_names=self.joint_names_r, increase_tick=False)
+
+        # 2) 그리퍼 적용
+        gripper_joints_l = ['gripper_l_joint1', 'gripper_l_joint2', 'gripper_l_joint3', 'gripper_l_joint4']
+        gripper_joints_r = ['gripper_r_joint1', 'gripper_r_joint2', 'gripper_r_joint3', 'gripper_r_joint4']
+        self.env.forward(q=self.q_l[7:], joint_names=gripper_joints_l, increase_tick=False)
+        self.env.forward(q=self.q_r[7:], joint_names=gripper_joints_r, increase_tick=False)
+
+        # 3) 물리 시뮬레이션 실행 (lift를 건드리지 않음)
+        self.env.forward(increase_tick=True)
+
+        # 4) 물리 실행 후, lift/head를 키보드 값으로 다시 고정 (IK와 무관)
+        self.env.forward(q=self.q_extra, joint_names=self.joint_names_extra, increase_tick=False)
 
     def grab_image(self):
         '''
@@ -331,18 +347,18 @@ class SimpleEnv:
         d_head1 = 0.0
         d_head2 = 0.0
 
-        # ✅ ARM 움직임 (WASD + RF)
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_W):  # 앞으로
-            dpos += np.array([0.007, 0.0, 0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_S):  # 뒤로
-            dpos += np.array([-0.007, 0.0, 0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_A):  # 왼쪽
+        # ARM 움직임 (시청자 기준)
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_W):  # 위쪽 (y+)
             dpos += np.array([0.0, 0.007, 0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_D):  # 오른쪽
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_S):  # 아래쪽 (y-)
             dpos += np.array([0.0, -0.007, 0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_R):  # 위로
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_A):  # 왼쪽 (x-)
+            dpos += np.array([-0.007, 0.0, 0.0])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_D):  # 오른쪽 (x+)
+            dpos += np.array([0.007, 0.0, 0.0])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_R):  # 상승 (z+)
             dpos += np.array([0.0, 0.0, 0.007])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_F):  # 아래로
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_F):  # 하강 (z-)
             dpos += np.array([0.0, 0.0, -0.007])
 
         # ARM 회전 (화살표 + QE)
@@ -359,13 +375,13 @@ class SimpleEnv:
         if self.env.is_key_pressed_repeat(key=glfw.KEY_E):
             drot = rotation_matrix(angle=-0.03, direction=[0.0, 1.0, 0.0])[:3, :3]
 
-        # ✅ LIFT 제어 (V/B) - XML: range="0 0.25" (meter)
+        # ✅ LIFT 제어 (V/B) - 키보드 입력으로만 변경
         if self.env.is_key_pressed_repeat(key=glfw.KEY_V):
             d_lift = 0.005
         if self.env.is_key_pressed_repeat(key=glfw.KEY_B):
             d_lift = -0.005
 
-        # ✅ HEAD 제어 (N/M + ,/.) - XML: head1: 0~0.4, head2: -0.6~0.6 (radian)
+        # ✅ HEAD 제어 (N/M + ,/.)
         if self.env.is_key_pressed_repeat(key=glfw.KEY_N):
             d_head1 = 0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_M):
@@ -379,7 +395,7 @@ class SimpleEnv:
         if self.env.is_key_pressed_once(key=glfw.KEY_Z):
             return np.zeros(8, dtype=np.float32), np.zeros(8, dtype=np.float32), True
 
-        # ✅ 그리퍼 토글 (각 팔 독립적)
+        # 그리퍼 토글
         if self.env.is_key_pressed_once(key=glfw.KEY_SPACE):
             if self.control_arm == 'left':
                 self.gripper_l_state = not self.gripper_l_state
@@ -388,26 +404,24 @@ class SimpleEnv:
                 self.gripper_r_state = not self.gripper_r_state
                 print(f"✅ Right gripper: {'CLOSE' if self.gripper_r_state else 'OPEN'}")
 
-        # 액션 생성
+    # 액션 생성
         drot = r2rpy(drot)
-        
-        # ✅ 왼손 control 시 오른손 완전 고정
+    
         if self.control_arm == 'left':
             action_l = np.concatenate([dpos, drot, np.array([self.gripper_l_state], dtype=np.float32)])
             action_r = np.zeros(8, dtype=np.float32)
-            action_r[-1] = self.gripper_r_state  # 오른손 그리퍼 상태 유지
+            action_r[-1] = self.gripper_r_state
         else:
             action_l = np.zeros(8, dtype=np.float32)
-            action_l[-1] = self.gripper_l_state  # 왼손 그리퍼 상태 유지
+            action_l[-1] = self.gripper_l_state
             action_r = np.concatenate([dpos, drot, np.array([self.gripper_r_state], dtype=np.float32)])
 
-        # ✅ Lift, Head 변경 (XML 기준 Joint Limit)
+    # ✅ Lift, Head 변경 (키보드 입력으로만)
         d_extra = np.array([d_lift, d_head1, d_head2], dtype=np.float32)
         self.q_extra = self.q_extra + d_extra
-        # lift: 0.0~0.25(m), head1: 0~0.4(rad), head2: -0.6~0.6(rad)
         self.q_extra = np.clip(self.q_extra, 
-                               [0.0, 0.0, -0.6], 
-                               [0.25, 0.4, 0.6])
+                               [0.0, -0.6, -0.6], 
+                               [0.25, 0.6, 0.6])
 
         return action_l, action_r, False
     
