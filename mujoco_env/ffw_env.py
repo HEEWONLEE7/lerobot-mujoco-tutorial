@@ -71,12 +71,17 @@ class SimpleEnv:
         '''
         if seed != None: np.random.seed(seed=0) 
         
-        # ✅ Zero Pose 직접 설정 (IK 없음)
-        q_init_l = np.deg2rad([0, 0, 0, 0, 0, 0, -90])
-        q_init_r = np.deg2rad([0, 0, 0, 0, 0, 0, -90])
-        q_init_extra = np.deg2rad([0.25, 0, 0])
+        # ✅ joint 이름 출력 (확인용)
+        print("Left arm joints:", self.joint_names_l)
+        print("Right arm joints:", self.joint_names_r)
+        print("Extra joints:", self.joint_names_extra)
         
-        # Zero Pose 사용
+        # ✅ joint4만 -1.86으로 (ㄴ자 형태)
+        q_init_l = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        q_init_r = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # ✅ lift는 0으로
+        q_init_extra = np.array([0.0, 0.0, 0.0])  # [lift(m), head1(rad), head2(rad)]
+        
         q_zero_l = q_init_l
         q_zero_r = q_init_r
         
@@ -109,13 +114,17 @@ class SimpleEnv:
         self.q_r = np.concatenate([q_zero_r, np.array([0.0]*4)])
         self.q_extra = q_init_extra
         
+        # ✅ 초기 목표 위치를 현재 위치로 설정 (IK 계산 방지)
         self.p0_l, self.R0_l = self.env.get_pR_body(body_name='tcp_l_link')
         self.p0_r, self.R0_r = self.env.get_pR_body(body_name='tcp_r_link')
         
         mug_init_pose, plate_init_pose = self.get_obj_pose()
         self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
+        
+        # ✅ step_env()만 실행 (step() 호출 안 함)
         for _ in range(100):
             self.step_env()
+        
         print("✓ INITIALIZATION COMPLETE")
         self.gripper_l = False
         self.gripper_r = False
@@ -123,57 +132,68 @@ class SimpleEnv:
     def step(self, action_l, action_r):
         '''
         Take a step in the environment
-        args:
-            action_l: np.array of shape (8,), left arm action
-            action_r: np.array of shape (8,), right arm action
-        returns:
-            state_l, state_r: np.array, state of both arms
         '''
+        # ✅ 왼손: action이 있을 때만 IK 계산
         if self.action_type == 'eef_pose':
             q_l = self.env.get_qpos_joints(joint_names=self.joint_names_l)
-            self.p0_l += action_l[:3]
-            self.R0_l = self.R0_l.dot(rpy2r(action_l[3:6]))
-            q_l ,ik_err_stack,ik_info = solve_ik(
-                env                = self.env,
-                joint_names_for_ik = self.joint_names_l,
-                body_name_trgt     = 'tcp_l_link',
-                q_init             = q_l,
-                p_trgt             = self.p0_l,
-                R_trgt             = self.R0_l,
-                max_ik_tick        = 50,
-                ik_stepsize        = 1.0,
-                ik_eps             = 1e-2,
-                ik_th              = np.radians(5.0),
-                render             = False,
-                verbose_warning    = False,
-            )
+            
+            has_action_l = np.sum(np.abs(action_l[:6])) > 1e-6
+            if has_action_l:
+                self.p0_l += action_l[:3]
+                self.R0_l = self.R0_l.dot(rpy2r(action_l[3:6]))
+                
+                # ✅ action이 있을 때만 IK 계산
+                q_l, ik_err_stack, ik_info = solve_ik(
+                    env                = self.env,
+                    joint_names_for_ik = self.joint_names_l,
+                    body_name_trgt     = 'tcp_l_link',
+                    q_init             = q_l,
+                    p_trgt             = self.p0_l,
+                    R_trgt             = self.R0_l,
+                    max_ik_tick        = 50,
+                    ik_stepsize        = 1.0,
+                    ik_eps             = 1e-2,
+                    ik_th              = np.radians(5.0),
+                    render             = False,
+                    verbose_warning    = False,
+                )
         elif self.action_type == 'delta_joint_angle':
             q_l = action_l[:-1] + self.last_q_l
         elif self.action_type == 'joint_angle':
             q_l = action_l[:-1]
+        else:
+            q_l = self.env.get_qpos_joints(joint_names=self.joint_names_l)
         
+        # ✅ 오른손: action이 있을 때만 IK 계산
         if self.action_type == 'eef_pose':
             q_r = self.env.get_qpos_joints(joint_names=self.joint_names_r)
-            self.p0_r += action_r[:3]
-            self.R0_r = self.R0_r.dot(rpy2r(action_r[3:6]))
-            q_r ,ik_err_stack,ik_info = solve_ik(
-                env                = self.env,
-                joint_names_for_ik = self.joint_names_r,
-                body_name_trgt     = 'tcp_r_link',
-                q_init             = q_r,
-                p_trgt             = self.p0_r,
-                R_trgt             = self.R0_r,
-                max_ik_tick        = 50,
-                ik_stepsize        = 1.0,
-                ik_eps             = 1e-2,
-                ik_th              = np.radians(5.0),
-                render             = False,
-                verbose_warning    = False,
-            )
+            
+            has_action_r = np.sum(np.abs(action_r[:6])) > 1e-6
+            if has_action_r:
+                self.p0_r += action_r[:3]
+                self.R0_r = self.R0_r.dot(rpy2r(action_r[3:6]))
+                
+                # ✅ action이 있을 때만 IK 계산
+                q_r, ik_err_stack, ik_info = solve_ik(
+                    env                = self.env,
+                    joint_names_for_ik = self.joint_names_r,
+                    body_name_trgt     = 'tcp_r_link',
+                    q_init             = q_r,
+                    p_trgt             = self.p0_r,
+                    R_trgt             = self.R0_r,
+                    max_ik_tick        = 50,
+                    ik_stepsize        = 1.0,
+                    ik_eps             = 1e-2,
+                    ik_th              = np.radians(5.0),
+                    render             = False,
+                    verbose_warning    = False,
+                )
         elif self.action_type == 'delta_joint_angle':
             q_r = action_r[:-1] + self.last_q_r
         elif self.action_type == 'joint_angle':
             q_r = action_r[:-1]
+        else:
+            q_r = self.env.get_qpos_joints(joint_names=self.joint_names_r)
         
         gripper_cmd_l = np.array([action_l[-1]]*4)
         gripper_cmd_l[[1,3]] *= 0.8
@@ -187,6 +207,8 @@ class SimpleEnv:
 
         self.q_l = q_l
         self.q_r = q_r
+        
+        # ✅ Lift는 step()에서 업데이트하지 않음 (teleop_robot()에서만 제어)
         
         if self.state_type == 'joint_angle':
             return self.get_joint_state()
@@ -291,133 +313,105 @@ class SimpleEnv:
     def teleop_robot(self):
         '''
         Teleoperate the robot using keyboard
-        returns:
-            action_l, action_r: np.array, action to take
-            done: bool, True if the user wants to reset the teleoperation
-        
-        Keys:
-            LEFT/RIGHT ARM (WASD + RF):
-            ---------     -----------------------
-               w       ->        backward
-            s  a  d        left   forward   right
-            ---------      -----------------------
-            In x, y plane
-
-            ---------
-            R: Moving Up
-            F: Moving Down
-            ---------
-            In z axis
-
-            ---------
-            Q: Tilt left
-            E: Tilt right
-            UP: Look Upward
-            Down: Look Downward
-            Right: Turn right
-            Left: Turn left
-            ---------
-            For rotation
-
-            LIFT CONTROL (V/B):
-            V: lift up
-            B: lift down
-
-            HEAD CONTROL (N/M + comma/period):
-            N: head_joint1 +
-            M: head_joint1 -
-            ,: head_joint2 +
-            .: head_joint2 -
-
-            ---------
-            TAB: Switch control arm
-            z: reset
-            SPACEBAR: gripper open/close
-            ---------   
         '''
         # 팔 전환 상태 변수 초기화
         if not hasattr(self, 'control_arm'):
             self.control_arm = 'left'
-            self.gripper_state = False
+            self.gripper_l_state = False
+            self.gripper_r_state = False
 
         # 팔 전환
         if self.env.is_key_pressed_once(key=glfw.KEY_TAB):
             self.control_arm = 'right' if self.control_arm == 'left' else 'left'
-            print(f"Switched to {self.control_arm.upper()} arm")
+            print(f"✅ Switched to {self.control_arm.upper()} arm")
 
         dpos = np.zeros(3)
         drot = np.eye(3)
-        d_lift = 0.2
+        d_lift = 0.0
         d_head1 = 0.0
         d_head2 = 0.0
 
-        # ARM 움직임
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_S):
-            dpos += np.array([0.007,0.0,0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_W):
-            dpos += np.array([-0.007,0.0,0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_A):
-            dpos += np.array([0.0,-0.007,0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_D):
-            dpos += np.array([0.0,0.007,0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_R):
-            dpos += np.array([0.0,0.0,0.007])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_F):
-            dpos += np.array([0.0,0.0,-0.007])
+        # ✅ ARM 움직임 (WASD + RF)
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_W):  # 앞으로
+            dpos += np.array([0.007, 0.0, 0.0])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_S):  # 뒤로
+            dpos += np.array([-0.007, 0.0, 0.0])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_A):  # 왼쪽
+            dpos += np.array([0.0, 0.007, 0.0])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_D):  # 오른쪽
+            dpos += np.array([0.0, -0.007, 0.0])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_R):  # 위로
+            dpos += np.array([0.0, 0.0, 0.007])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_F):  # 아래로
+            dpos += np.array([0.0, 0.0, -0.007])
 
-        # ARM 회전
-        if  self.env.is_key_pressed_repeat(key=glfw.KEY_LEFT):
-            drot = rotation_matrix(angle=0.1 * 0.3, direction=[0.0, 1.0, 0.0])[:3, :3]
-        if  self.env.is_key_pressed_repeat(key=glfw.KEY_RIGHT):
-            drot = rotation_matrix(angle=-0.1 * 0.3, direction=[0.0, 1.0, 0.0])[:3, :3]
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_DOWN):
-            drot = rotation_matrix(angle=0.1 * 0.3, direction=[1.0, 0.0, 0.0])[:3, :3]
+        # ARM 회전 (화살표 + QE)
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_LEFT):
+            drot = rotation_matrix(angle=0.03, direction=[0.0, 0.0, 1.0])[:3, :3]
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_RIGHT):
+            drot = rotation_matrix(angle=-0.03, direction=[0.0, 0.0, 1.0])[:3, :3]
         if self.env.is_key_pressed_repeat(key=glfw.KEY_UP):
-            drot = rotation_matrix(angle=-0.1 * 0.3, direction=[1.0, 0.0, 0.0])[:3, :3]
+            drot = rotation_matrix(angle=0.03, direction=[1.0, 0.0, 0.0])[:3, :3]
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_DOWN):
+            drot = rotation_matrix(angle=-0.03, direction=[1.0, 0.0, 0.0])[:3, :3]
         if self.env.is_key_pressed_repeat(key=glfw.KEY_Q):
-            drot = rotation_matrix(angle=0.1 * 0.3, direction=[0.0, 0.0, 1.0])[:3, :3]
+            drot = rotation_matrix(angle=0.03, direction=[0.0, 1.0, 0.0])[:3, :3]
         if self.env.is_key_pressed_repeat(key=glfw.KEY_E):
-            drot = rotation_matrix(angle=-0.1 * 0.3, direction=[0.0, 0.0, 1.0])[:3, :3]
+            drot = rotation_matrix(angle=-0.03, direction=[0.0, 1.0, 0.0])[:3, :3]
 
-        # LIFT 제어 (V/B)
+        # ✅ LIFT 제어 (V/B) - XML: range="0 0.25" (meter)
         if self.env.is_key_pressed_repeat(key=glfw.KEY_V):
-            d_lift += 0.01
+            d_lift = 0.005
         if self.env.is_key_pressed_repeat(key=glfw.KEY_B):
-            d_lift -= 0.01
+            d_lift = -0.005
 
-        # HEAD 제어 (N/M + comma/period)
+        # ✅ HEAD 제어 (N/M + ,/.) - XML: head1: 0~0.4, head2: -0.6~0.6 (radian)
         if self.env.is_key_pressed_repeat(key=glfw.KEY_N):
-            d_head1 += 0.01
+            d_head1 = 0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_M):
-            d_head1 -= 0.01
+            d_head1 = -0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_COMMA):
-            d_head2 += 0.01
+            d_head2 = 0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_PERIOD):
-            d_head2 -= 0.01
+            d_head2 = -0.02
 
-        # 그리퍼와 리셋
+        # 리셋
         if self.env.is_key_pressed_once(key=glfw.KEY_Z):
             return np.zeros(8, dtype=np.float32), np.zeros(8, dtype=np.float32), True
+
+        # ✅ 그리퍼 토글 (각 팔 독립적)
         if self.env.is_key_pressed_once(key=glfw.KEY_SPACE):
-            self.gripper_state = not self.gripper_state
+            if self.control_arm == 'left':
+                self.gripper_l_state = not self.gripper_l_state
+                print(f"✅ Left gripper: {'CLOSE' if self.gripper_l_state else 'OPEN'}")
+            else:
+                self.gripper_r_state = not self.gripper_r_state
+                print(f"✅ Right gripper: {'CLOSE' if self.gripper_r_state else 'OPEN'}")
 
         # 액션 생성
         drot = r2rpy(drot)
         
+        # ✅ 왼손 control 시 오른손 완전 고정
         if self.control_arm == 'left':
-            action_l = np.concatenate([dpos, drot, np.array([self.gripper_state],dtype=np.float32)],dtype=np.float32)
+            action_l = np.concatenate([dpos, drot, np.array([self.gripper_l_state], dtype=np.float32)])
             action_r = np.zeros(8, dtype=np.float32)
+            action_r[-1] = self.gripper_r_state  # 오른손 그리퍼 상태 유지
         else:
             action_l = np.zeros(8, dtype=np.float32)
-            action_r = np.concatenate([dpos, drot, np.array([self.gripper_state],dtype=np.float32)],dtype=np.float32)
+            action_l[-1] = self.gripper_l_state  # 왼손 그리퍼 상태 유지
+            action_r = np.concatenate([dpos, drot, np.array([self.gripper_r_state], dtype=np.float32)])
 
-        # lift, head 변경사항
+        # ✅ Lift, Head 변경 (XML 기준 Joint Limit)
         d_extra = np.array([d_lift, d_head1, d_head2], dtype=np.float32)
-        self.q_extra = np.clip(self.q_extra + d_extra, -np.pi, np.pi)
+        self.q_extra = self.q_extra + d_extra
+        # lift: 0.0~0.25(m), head1: 0~0.4(rad), head2: -0.6~0.6(rad)
+        self.q_extra = np.clip(self.q_extra, 
+                               [0.0, 0.0, -0.6], 
+                               [0.25, 0.4, 0.6])
 
         return action_l, action_r, False
     
-    def get_delta_q_l(self):
+    def get_delta_q_l(self):                 
         '''
         Get the delta joint angles of the left arm
         '''
