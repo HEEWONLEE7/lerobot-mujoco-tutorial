@@ -102,7 +102,7 @@
 
             <body name="arm_l_link4" pos="0.041004 0 -0.135">
               <inertial pos="-4.39703e-05 0.00978704 -0.137888" quat="0.984403 -0.175803 -0.00125587 -0.00649472" mass="1.51314" diaginertia="0.00636289 0.00628017 0.00133396"/>
-              <joint name="arm_l_joint4" class="robot" pos="0 0 0" axis="0 1 0" range="-2.9361 1.0786" ref="1.86"/>
+              <joint name="arm_l_joint4" class="robot" pos="0 0 0" axis="0 1 0" range="-2.9361 1.0786" ref="1.57"/>
               <geom type="mesh" rgba="0.2 0.2 0.2 1" mesh="arm_l_link4"/>
 
               <body name="arm_l_link5" pos="-0.041004 0 -0.1489">
@@ -181,7 +181,7 @@
 
             <body name="arm_r_link4" pos="0.041004 0 -0.135">
               <inertial pos="4.39703e-05 -0.00978736 -0.137888" quat="0.984402 0.175809 0.00125565 -0.00649329" mass="1.51314" diaginertia="0.00636295 0.00628021 0.00133398"/>
-              <joint name="arm_r_joint4" class="robot" pos="0 0 0" axis="0 1 0" range="-2.9361 1.0786" ref="1.86"/>
+              <joint name="arm_r_joint4" class="robot" pos="0 0 0" axis="0 1 0" range="-2.9361 1.0786" ref="1.57"/>
               <geom type="mesh" rgba="0.2 0.2 0.2 1" mesh="arm_r_link4"/>
 
               <body name="arm_r_link5" pos="-0.041004 0 -0.1489">
