@@ -315,11 +315,28 @@ class SimpleEnv:
         p_current_l, R_current_l = self.env.get_pR_body(body_name='tcp_l_link')
         p_current_r, R_current_r = self.env.get_pR_body(body_name='tcp_r_link')
         
-        # 왼팔 TCP 시각화
-        self.env.plot_sphere(p=p_current_l, r=0.02, rgba=[0.95,0.05,0.05,0.8])
+        # ✅ 왼팔 TCP 시각화
+        self.env.plot_sphere(p=p_current_l, r=0.02, rgba=[0.95,0.05,0.05,0.5])
         
-        # 오른팔 TCP 시각화
-        self.env.plot_sphere(p=p_current_r, r=0.02, rgba=[0.05,0.05,0.95,0.8])
+        # ✅ 캡슐을 수직으로 아래로 내려가게 (Z축 방향)
+        # 회전 행렬: 90도 회전해서 수직 방향으로
+        R_current_l_rotated = R_current_l @ np.array([[0,0,-1],[0,1,0],[1,0,0]])
+        
+        # ✅ 캡슐의 시작점을 구 아래로 이동 (더 내려감)
+        capsule_offset_l = np.array([0, 0, -0.2])  # 0.15 → 0.25로 더 내림
+        p_capsule_l = p_current_l + capsule_offset_l
+        self.env.plot_capsule(p=p_capsule_l, R=R_current_l_rotated, r=0.01, h=0.2, rgba=[0.05,0.95,0.05,0.5])
+        
+        # ✅ 오른팔 TCP 시각화
+        self.env.plot_sphere(p=p_current_r, r=0.02, rgba=[0.95,0.05,0.05,0.5])
+        
+        # ✅ 캡슐을 수직으로 아래로 내려가게
+        R_current_r_rotated = R_current_r @ np.array([[0,0,-1],[0,1,0],[1,0,0]])
+        
+        # ✅ 캡슐의 시작점을 구 아래로 이동
+        capsule_offset_r = np.array([0, 0, -0.2])  # 0.15 → 0.25로 더 내림
+        p_capsule_r = p_current_r + capsule_offset_r
+        self.env.plot_capsule(p=p_capsule_r, R=R_current_r_rotated, r=0.01, h=0.2, rgba=[0.05,0.95,0.05,0.5])
         
         rgb_egocentric_view = add_title_to_img(self.rgb_ego,text='Egocentric View',shape=(640,480))
         rgb_agent_view = add_title_to_img(self.rgb_agent,text='Agent View',shape=(640,480))
