@@ -383,13 +383,13 @@ class SimpleEnv:
 
         # ✅ HEAD 제어 (N/M + ,/.)
         if self.env.is_key_pressed_repeat(key=glfw.KEY_N):
-            d_head1 = 0.02
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_M):
             d_head1 = -0.02
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_M):
+            d_head1 = 0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_COMMA):
-            d_head2 = 0.02
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_PERIOD):
             d_head2 = -0.02
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_PERIOD):
+            d_head2 = 0.02
 
         # 리셋
         if self.env.is_key_pressed_once(key=glfw.KEY_Z):
@@ -420,8 +420,8 @@ class SimpleEnv:
         d_extra = np.array([d_lift, d_head1, d_head2], dtype=np.float32)
         self.q_extra = self.q_extra + d_extra
         self.q_extra = np.clip(self.q_extra, 
-                               [0.0, -0.6, -0.6], 
-                               [0.25, 0.6, 0.6])
+                               [-0.25, -0.6, -0.6], 
+                               [0.1, 0.6, 0.6])
 
         return action_l, action_r, False
     
