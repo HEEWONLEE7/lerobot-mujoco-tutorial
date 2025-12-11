@@ -332,33 +332,24 @@ class SimpleEnv:
         p_current_l, R_current_l = self.env.get_pR_body(body_name='tcp_l_link')
         p_current_r, R_current_r = self.env.get_pR_body(body_name='tcp_r_link')
 
-        # 공통: 캡슐 파라미터
         cap_r = 0.01
-        cap_h = 0.20
-        # gripper 전방축(도구 -Z)이 캡슐 z축으로 가도록 회전 정렬
+        cap_h = 0.12
+        trim_top = 0.07 # ✅ 위를 이만큼 잘라냄
         R_align = np.array([[0, 0, 1],
                             [0, 1, 0],
-                            [1, 0, 0]])  # z->x 매핑
+                            [1, 0, 0]])  # gripper -Z -> capsule +Z
 
-        # 왼팔: 구(기준점) + 손목 회전 적용 캡슐
+        # 왼팔: 구는 기준점, 위는 잘라내고 아래로만
         self.env.plot_sphere(p=p_current_l, r=0.02, rgba=[0.95, 0.05, 0.05, 0.5])
-        self.env.plot_capsule(
-            p=p_current_l,                 # ✅ 위치 그대로 (구 중심)
-            R=R_current_l @ R_align,       # ✅ 손목 회전 + 축 정렬
-            r=cap_r,
-            h=cap_h,
-            rgba=[0.05, 0.95, 0.05, 0.5]
-        )
+        R_cap_l = R_current_l @ R_align
+        p_cap_l = p_current_l + R_cap_l @ np.array([0, 0, -(cap_h/2 + trim_top)])
+        self.env.plot_capsule(p=p_cap_l, R=R_cap_l, r=cap_r, h=cap_h, rgba=[0.05, 0.95, 0.05, 0.5])
 
-        # 오른팔: 구 + 손목 회전 적용 캡슐
+        # 오른팔 동일
         self.env.plot_sphere(p=p_current_r, r=0.02, rgba=[0.95, 0.05, 0.05, 0.5])
-        self.env.plot_capsule(
-            p=p_current_r,                 # ✅ 위치 그대로 (구 중심)
-            R=R_current_r @ R_align,       # ✅ 손목 회전 + 축 정렬
-            r=cap_r,
-            h=cap_h,
-            rgba=[0.05, 0.95, 0.05, 0.5]
-        )
+        R_cap_r = R_current_r @ R_align
+        p_cap_r = p_current_r + R_cap_r @ np.array([0, 0, -(cap_h/2 + trim_top)])
+        self.env.plot_capsule(p=p_cap_r, R=R_cap_r, r=cap_r, h=cap_h, rgba=[0.05, 0.95, 0.05, 0.5])
 
         rgb_egocentric_view = add_title_to_img(self.rgb_ego,text='Egocentric View',shape=(640,480))
         rgb_agent_view = add_title_to_img(self.rgb_agent,text='Agent View',shape=(640,480))
