@@ -333,8 +333,8 @@ class SimpleEnv:
         p_current_r, R_current_r = self.env.get_pR_body(body_name='tcp_r_link')
 
         cap_r = 0.01
-        cap_h = 0.12
-        trim_top = 0.07 # ✅ 위를 이만큼 잘라냄
+        cap_h = 0.2
+        trim_top = 0.1 # ✅ 위를 이만큼 잘라냄
         R_align = np.array([[0, 0, 1],
                             [0, 1, 0],
                             [1, 0, 0]])  # gripper -Z -> capsule +Z
