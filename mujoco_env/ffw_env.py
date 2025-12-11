@@ -76,7 +76,6 @@ class SimpleEnv:
         print("Right arm joints:", self.joint_names_r)
         print("Extra joints:", self.joint_names_extra)
         
-        # ✅ joint4를 0으로 (XML ref=-1.86 적용됨)
         q_init_l = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         q_init_r = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         # ✅ lift는 0으로
@@ -244,16 +243,17 @@ class SimpleEnv:
         grab images from the environment
         returns:
             rgb_agent: np.array, rgb image from the agent's view
-            rgb_ego: np.array, rgb image from the egocentric
+            rgb_ego: np.array, rgb image from the egocentric (현재 제어 중인 팔의 카메라)
         '''
-        self.rgb_agent = self.env.get_fixed_cam_rgb(
-            cam_name='agentview')
-        self.rgb_ego = self.env.get_fixed_cam_rgb(
-            cam_name='egocentric')
-        # self.rgb_top = self.env.get_fixed_cam_rgbd_pcd(
-        #     cam_name='topview')
-        self.rgb_side = self.env.get_fixed_cam_rgb(
-            cam_name='sideview')
+        self.rgb_agent = self.env.get_fixed_cam_rgb(cam_name='agentview')
+        self.rgb_side = self.env.get_fixed_cam_rgb(cam_name='sideview')
+        
+        # ✅ 현재 제어 중인 팔에 따라 egocentric 카메라 선택
+        if hasattr(self, 'control_arm') and self.control_arm == 'right':
+            self.rgb_ego = self.env.get_fixed_cam_rgb(cam_name='egocentric_r')
+        else:
+            self.rgb_ego = self.env.get_fixed_cam_rgb(cam_name='egocentric_l')
+        
         return self.rgb_agent, self.rgb_ego
         
 
@@ -349,13 +349,13 @@ class SimpleEnv:
 
         # ARM 움직임 (시청자 기준)
         if self.env.is_key_pressed_repeat(key=glfw.KEY_W):  # 위쪽 (y+)
-            dpos += np.array([0.0, 0.007, 0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_S):  # 아래쪽 (y-)
-            dpos += np.array([0.0, -0.007, 0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_A):  # 왼쪽 (x-)
-            dpos += np.array([-0.007, 0.0, 0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_D):  # 오른쪽 (x+)
             dpos += np.array([0.007, 0.0, 0.0])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_S):  # 아래쪽 (y-)
+            dpos += np.array([-0.007, 0.0, 0.0])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_A):  # 왼쪽 (x-)
+            dpos += np.array([0.0, -0.007, 0.0])
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_D):  # 오른쪽 (x+)
+            dpos += np.array([0.0, 0.007, 0.0])
         if self.env.is_key_pressed_repeat(key=glfw.KEY_R):  # 상승 (z+)
             dpos += np.array([0.0, 0.0, 0.007])
         if self.env.is_key_pressed_repeat(key=glfw.KEY_F):  # 하강 (z-)
