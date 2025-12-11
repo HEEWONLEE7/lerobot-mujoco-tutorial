@@ -132,30 +132,37 @@ class SimpleEnv:
         '''
         Take a step in the environment
         '''
-        # ✅ 왼손: action이 있을 때만 IK 계산
+        # ✅ Lift 변화량 계산 (이전 값과 현재 값의 차이)
+        lift_change = self.q_extra[0] - self.last_q_extra[0]
+        
+        # ✅ 왼손: IK 목표를 Lift 변화에 따라 업데이트
         if self.action_type == 'eef_pose':
             q_l = self.env.get_qpos_joints(joint_names=self.joint_names_l)
+            
+            # ✅ Lift가 변했으면 목표 위치의 Z도 업데이트
+            if abs(lift_change) > 1e-6:
+                self.p0_l[2] += lift_change
             
             has_action_l = np.sum(np.abs(action_l[:6])) > 1e-6
             if has_action_l:
                 self.p0_l += action_l[:3]
                 self.R0_l = self.R0_l.dot(rpy2r(action_l[3:6]))
-                
-                # ✅ action이 있을 때만 IK 계산
-                q_l, ik_err_stack, ik_info = solve_ik(
-                    env                = self.env,
-                    joint_names_for_ik = self.joint_names_l,
-                    body_name_trgt     = 'tcp_l_link',
-                    q_init             = q_l,
-                    p_trgt             = self.p0_l,
-                    R_trgt             = self.R0_l,
-                    max_ik_tick        = 50,
-                    ik_stepsize        = 1.0,
-                    ik_eps             = 1e-2,
-                    ik_th              = np.radians(5.0),
-                    render             = False,
-                    verbose_warning    = False,
-                )
+            
+            # ✅ 항상 IK 계산
+            q_l, ik_err_stack, ik_info = solve_ik(
+                env                = self.env,
+                joint_names_for_ik = self.joint_names_l,
+                body_name_trgt     = 'tcp_l_link',
+                q_init             = q_l,
+                p_trgt             = self.p0_l,
+                R_trgt             = self.R0_l,
+                max_ik_tick        = 50,
+                ik_stepsize        = 1.0,
+                ik_eps             = 1e-2,
+                ik_th              = np.radians(5.0),
+                render             = False,
+                verbose_warning    = False,
+            )
         elif self.action_type == 'delta_joint_angle':
             q_l = action_l[:-1] + self.last_q_l
         elif self.action_type == 'joint_angle':
@@ -163,30 +170,34 @@ class SimpleEnv:
         else:
             q_l = self.env.get_qpos_joints(joint_names=self.joint_names_l)
         
-        # ✅ 오른손: action이 있을 때만 IK 계산
+        # ✅ 오른손: IK 목표를 Lift 변화에 따라 업데이트
         if self.action_type == 'eef_pose':
             q_r = self.env.get_qpos_joints(joint_names=self.joint_names_r)
+            
+            # ✅ Lift가 변했으면 목표 위치의 Z도 업데이트
+            if abs(lift_change) > 1e-6:
+                self.p0_r[2] += lift_change
             
             has_action_r = np.sum(np.abs(action_r[:6])) > 1e-6
             if has_action_r:
                 self.p0_r += action_r[:3]
                 self.R0_r = self.R0_r.dot(rpy2r(action_r[3:6]))
-                
-                # ✅ action이 있을 때만 IK 계산
-                q_r, ik_err_stack, ik_info = solve_ik(
-                    env                = self.env,
-                    joint_names_for_ik = self.joint_names_r,
-                    body_name_trgt     = 'tcp_r_link',
-                    q_init             = q_r,
-                    p_trgt             = self.p0_r,
-                    R_trgt             = self.R0_r,
-                    max_ik_tick        = 50,
-                    ik_stepsize        = 1.0,
-                    ik_eps             = 1e-2,
-                    ik_th              = np.radians(5.0),
-                    render             = False,
-                    verbose_warning    = False,
-                )
+            
+            # ✅ 항상 IK 계산
+            q_r, ik_err_stack, ik_info = solve_ik(
+                env                = self.env,
+                joint_names_for_ik = self.joint_names_r,
+                body_name_trgt     = 'tcp_r_link',
+                q_init             = q_r,
+                p_trgt             = self.p0_r,
+                R_trgt             = self.R0_r,
+                max_ik_tick        = 50,
+                ik_stepsize        = 1.0,
+                ik_eps             = 1e-2,
+                ik_th              = np.radians(5.0),
+                render             = False,
+                verbose_warning    = False,
+            )
         elif self.action_type == 'delta_joint_angle':
             q_r = action_r[:-1] + self.last_q_r
         elif self.action_type == 'joint_angle':
@@ -207,7 +218,8 @@ class SimpleEnv:
         self.q_l = q_l
         self.q_r = q_r
         
-        # ✅ Lift는 step()에서 업데이트하지 않음 (teleop_robot()에서만 제어)
+        # ✅ 현재 lift 값으로 last_q_extra 업데이트
+        self.last_q_extra = copy.deepcopy(self.q_extra)
         
         if self.state_type == 'joint_angle':
             return self.get_joint_state()
