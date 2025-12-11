@@ -12,10 +12,10 @@ import glfw
 
 class SimpleEnv:
     def __init__(self, 
-                 xml_path,
-                action_type='eef_pose', 
-                state_type='joint_angle',
-                seed = None):
+             xml_path,
+            action_type='eef_pose', 
+            state_type='joint_angle',
+            seed = None):
         """
         args:
             xml_path: str, path to the xml file
@@ -48,6 +48,13 @@ class SimpleEnv:
                     'head_joint1',
                     'head_joint2']
         
+        # ✅ 그리퍼 관절 이름 저장
+        self.gripper_joints_l = ['gripper_l_joint1', 'gripper_l_joint2', 'gripper_l_joint3', 'gripper_l_joint4']
+        self.gripper_joints_r = ['gripper_r_joint1', 'gripper_r_joint2', 'gripper_r_joint3', 'gripper_r_joint4']
+        
+        # ✅ 모든 관절 이름을 순서대로 저장 (step_env에서 사용)
+        self.all_joint_names = self.joint_names_l + self.gripper_joints_l + self.joint_names_r + self.gripper_joints_r + self.joint_names_extra
+        
         self.init_viewer()
         self.reset(seed)
 
@@ -71,15 +78,13 @@ class SimpleEnv:
         '''
         if seed != None: np.random.seed(seed=0) 
         
-        # ✅ joint 이름 출력 (확인용)
         print("Left arm joints:", self.joint_names_l)
         print("Right arm joints:", self.joint_names_r)
         print("Extra joints:", self.joint_names_extra)
         
         q_init_l = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         q_init_r = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        # ✅ lift는 0으로
-        q_init_extra = np.array([0.0, 0.0, 0.0])  # [lift(m), head1(rad), head2(rad)]
+        q_init_extra = np.array([0.0, 0.0, 0.0])
         
         q_zero_l = q_init_l
         q_zero_r = q_init_r
@@ -99,6 +104,11 @@ class SimpleEnv:
             min_dist  = 0.2,
             xy_margin = 0.0
         )
+        
+        # ✅ 물체 위치 저장
+        self.obj_names = obj_names
+        self.obj_xyzs = obj_xyzs
+        
         for obj_idx in range(n_obj):
             self.env.set_p_base_body(body_name=obj_names[obj_idx],p=obj_xyzs[obj_idx,:])
             self.env.set_R_base_body(body_name=obj_names[obj_idx],R=np.eye(3,3))
@@ -113,15 +123,17 @@ class SimpleEnv:
         self.q_r = np.concatenate([q_zero_r, np.array([0.0]*4)])
         self.q_extra = q_init_extra
         
-        # ✅ 초기 목표 위치를 현재 위치로 설정 (IK 계산 방지)
         self.p0_l, self.R0_l = self.env.get_pR_body(body_name='tcp_l_link')
         self.p0_r, self.R0_r = self.env.get_pR_body(body_name='tcp_r_link')
         
         mug_init_pose, plate_init_pose = self.get_obj_pose()
         self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
         
-        # ✅ step_env()만 실행하되 Lift 고정
+        # ✅ 100번 루프 중 물체를 계속 초기 위치에 고정
         for _ in range(100):
+            # 물체를 테이블 위에 유지
+            for obj_idx in range(n_obj):
+                self.env.set_p_base_body(body_name=self.obj_names[obj_idx], p=self.obj_xyzs[obj_idx,:])
             self.step_env()
         
         print("✓ INITIALIZATION COMPLETE")
@@ -232,23 +244,20 @@ class SimpleEnv:
 
     def step_env(self):
         '''
-        Execute one physics step
+        Execute one physics step - y_env.py 방식으로 단순화
         '''
-        # 1) 팔 관절 적용 (lift 제외, IK도 팔만 사용)
-        self.env.forward(q=self.q_l[:7], joint_names=self.joint_names_l, increase_tick=False)
-        self.env.forward(q=self.q_r[:7], joint_names=self.joint_names_r, increase_tick=False)
-
-        # 2) 그리퍼 적용
-        gripper_joints_l = ['gripper_l_joint1', 'gripper_l_joint2', 'gripper_l_joint3', 'gripper_l_joint4']
-        gripper_joints_r = ['gripper_r_joint1', 'gripper_r_joint2', 'gripper_r_joint3', 'gripper_r_joint4']
-        self.env.forward(q=self.q_l[7:], joint_names=gripper_joints_l, increase_tick=False)
-        self.env.forward(q=self.q_r[7:], joint_names=gripper_joints_r, increase_tick=False)
-
-        # 3) 물리 시뮬레이션 실행 (lift를 건드리지 않음)
-        self.env.forward(increase_tick=True)
-
-        # 4) 물리 실행 후, lift/head를 키보드 값으로 다시 고정 (IK와 무관)
-        self.env.forward(q=self.q_extra, joint_names=self.joint_names_extra, increase_tick=False)
+        # ✅ 전체 관절을 한 번에 업데이트
+        # self.q = [q_l(7) + gripper_l(4) + q_r(7) + gripper_r(4) + q_extra(3)]
+        q_full = np.concatenate([
+            self.q_l[:7],                    # 왼팔 (7)
+            self.q_l[7:],                    # 왼팔 그리퍼 (4)
+            self.q_r[:7],                    # 오른팔 (7)
+            self.q_r[7:],                    # 오른팔 그리퍼 (4)
+            self.q_extra                     # 리프트 + 헤드 (3)
+        ])
+        
+        # ✅ 한 번에 forward + increase_tick
+        self.env.forward(q=q_full, joint_names=self.all_joint_names, increase_tick=True)
 
     def grab_image(self):
         '''
