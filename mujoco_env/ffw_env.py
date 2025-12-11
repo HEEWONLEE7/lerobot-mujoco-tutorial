@@ -109,9 +109,17 @@ class SimpleEnv:
         self.obj_names = obj_names
         self.obj_xyzs = obj_xyzs
         
+        # ✅ 물체를 더 높게 배치 (테이블 위 안전 마진)
         for obj_idx in range(n_obj):
-            self.env.set_p_base_body(body_name=obj_names[obj_idx],p=obj_xyzs[obj_idx,:])
-            self.env.set_R_base_body(body_name=obj_names[obj_idx],R=np.eye(3,3))
+            safe_xyz = obj_xyzs[obj_idx,:].copy()
+            safe_xyz[2] = 0.835  # 0.82 → 0.835
+            self.env.set_p_base_body(body_name=obj_names[obj_idx], p=safe_xyz)
+            self.env.set_R_base_body(body_name=obj_names[obj_idx], R=np.eye(3,3))
+        
+        # ✅ MuJoCo 물리 설정 개선
+        self.env.model.opt.timestep = 0.002  # 타임스텝 감소 (더 정밀한 계산)
+        self.env.model.opt.iterations = 50   # 반복 횟수 증가 (정확성 향상)
+        
         self.env.forward(increase_tick=False)
 
         # Set the initial pose of the robot
@@ -129,11 +137,15 @@ class SimpleEnv:
         mug_init_pose, plate_init_pose = self.get_obj_pose()
         self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
         
-        # ✅ 100번 루프 중 물체를 계속 초기 위치에 고정
-        for _ in range(100):
-            # 물체를 테이블 위에 유지
+        # ✅ 안정화 루프: 더 적은 횟수로 효율적으로
+        for i in range(30):
+            # 물체를 계속 고정 (박히지 않도록)
             for obj_idx in range(n_obj):
-                self.env.set_p_base_body(body_name=self.obj_names[obj_idx], p=self.obj_xyzs[obj_idx,:])
+                safe_xyz = self.obj_xyzs[obj_idx,:].copy()
+                safe_xyz[2] = 0.835
+                self.env.set_p_base_body(body_name=self.obj_names[obj_idx], p=safe_xyz)
+                self.env.set_R_base_body(body_name=self.obj_names[obj_idx], R=np.eye(3,3))
+            
             self.step_env()
         
         print("✓ INITIALIZATION COMPLETE")
@@ -244,20 +256,30 @@ class SimpleEnv:
 
     def step_env(self):
         '''
-        Execute one physics step - y_env.py 방식으로 단순화
+        Execute one physics step
         '''
-        # ✅ 전체 관절을 한 번에 업데이트
-        # self.q = [q_l(7) + gripper_l(4) + q_r(7) + gripper_r(4) + q_extra(3)]
         q_full = np.concatenate([
-            self.q_l[:7],                    # 왼팔 (7)
-            self.q_l[7:],                    # 왼팔 그리퍼 (4)
-            self.q_r[:7],                    # 오른팔 (7)
-            self.q_r[7:],                    # 오른팔 그리퍼 (4)
-            self.q_extra                     # 리프트 + 헤드 (3)
+            self.q_l[:7],
+            self.q_l[7:],
+            self.q_r[:7],
+            self.q_r[7:],
+            self.q_extra
         ])
         
-        # ✅ 한 번에 forward + increase_tick
         self.env.forward(q=q_full, joint_names=self.all_joint_names, increase_tick=True)
+        
+        # ✅ 물체가 테이블을 뚫지 않도록 충돌 감지 후 복원
+        if hasattr(self, 'obj_names') and hasattr(self, 'obj_xyzs'):
+            for obj_idx, obj_name in enumerate(self.obj_names):
+                p_obj = self.env.get_p_body(obj_name)
+                
+                # ✅ 물체가 테이블 아래로 떨어지면 원래 위치로 복원
+                if p_obj[2] < 0.815:  # 테이블 높이 0.80 + 마진
+                    safe_xyz = self.obj_xyzs[obj_idx,:].copy()
+                    safe_xyz[2] = 0.835
+                    self.env.set_p_base_body(body_name=obj_name, p=safe_xyz)
+                    # 속도도 초기화 (무한 떨어짐 방지)
+                    self.env.data.qvel[self.env.model.body(obj_name).dofadr[0]:self.env.model.body(obj_name).dofadr[0]+6] = 0
 
     def grab_image(self):
         '''
