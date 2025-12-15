@@ -272,19 +272,6 @@ class SimpleEnv:
 
         # ✅ 수정: 물리 시뮬레이션 스텝 실행 (접촉/충돌 반응 활성화)
         self.env.step(q_full, joint_names=self.all_joint_names)
-        
-        # ✅ 물체가 테이블을 뚫지 않도록 충돌 감지 후 복원
-        if hasattr(self, 'obj_names') and hasattr(self, 'obj_xyzs'):
-            for obj_idx, obj_name in enumerate(self.obj_names):
-                p_obj = self.env.get_p_body(obj_name)
-                
-                # ✅ 물체가 테이블 아래로 떨어지면 원래 위치로 복원
-                if p_obj[2] < 0.815:  # 테이블 높이 0.80 + 마진
-                    safe_xyz = self.obj_xyzs[obj_idx,:].copy()
-                    safe_xyz[2] = 0.835
-                    self.env.set_p_base_body(body_name=obj_name, p=safe_xyz)
-                    # 속도도 초기화 (무한 떨어짐 방지)
-                    self.env.data.qvel[self.env.model.body(obj_name).dofadr[0]:self.env.model.body(obj_name).dofadr[0]+6] = 0
 
     def grab_image(self):
         '''
@@ -432,19 +419,19 @@ class SimpleEnv:
 
         # ✅ LIFT 제어 (V/B) - 키보드 입력으로만 변경
         if self.env.is_key_pressed_repeat(key=glfw.KEY_V):
-            d_lift = 0.005
+            d_lift += 0.005
         if self.env.is_key_pressed_repeat(key=glfw.KEY_B):
-            d_lift = -0.005
+            d_lift += -0.005
 
         # ✅ HEAD 제어 (N/M + ,/.)
         if self.env.is_key_pressed_repeat(key=glfw.KEY_N):
-            d_head1 = -0.02
+            d_head1 += -0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_M):
-            d_head1 = 0.02
+            d_head1 += 0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_COMMA):
-            d_head2 = -0.02
+            d_head2 += -0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_PERIOD):
-            d_head2 = 0.02
+            d_head2 += 0.02
 
         # 리셋
         if self.env.is_key_pressed_once(key=glfw.KEY_Z):
@@ -478,7 +465,7 @@ class SimpleEnv:
                                [-0.25, -0.6, -0.6], 
                                [0.1, 0.6, 0.6])
 
-        return action_l, action_r, False
+        return action_l, action_r, d_extra, False
     
     def get_delta_q_l(self):                 
         '''
