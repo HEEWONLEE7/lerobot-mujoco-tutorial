@@ -140,11 +140,12 @@ class SimpleEnv:
         # ✅ 안정화 루프: 더 적은 횟수로 효율적으로
         for i in range(30):
             # 물체를 계속 고정 (박히지 않도록)
-            for obj_idx in range(n_obj):
-                safe_xyz = self.obj_xyzs[obj_idx,:].copy()
-                safe_xyz[2] = 0.835
-                self.env.set_p_base_body(body_name=self.obj_names[obj_idx], p=safe_xyz)
-                self.env.set_R_base_body(body_name=self.obj_names[obj_idx], R=np.eye(3,3))
+            # ❌ 초기화 중 강제 복원 제거: 접촉/물리 상호작용을 허용
+            # for obj_idx in range(n_obj):
+            #     safe_xyz = self.obj_xyzs[obj_idx,:].copy()
+            #     safe_xyz[2] = 0.835
+            #     self.env.set_p_base_body(body_name=self.obj_names[obj_idx], p=safe_xyz)
+            #     self.env.set_R_base_body(body_name=self.obj_names[obj_idx], R=np.eye(3,3))
             
             self.step_env()
         
@@ -266,7 +267,11 @@ class SimpleEnv:
             self.q_extra
         ])
         
-        self.env.forward(q=q_full, joint_names=self.all_joint_names, increase_tick=True)
+        # ❌ 기존: 물리 건너뜀(텔레포트)
+        # self.env.forward(q=q_full, joint_names=self.all_joint_names, increase_tick=True)
+
+        # ✅ 수정: 물리 시뮬레이션 스텝 실행 (접촉/충돌 반응 활성화)
+        self.env.step(q_full, joint_names=self.all_joint_names)
         
         # ✅ 물체가 테이블을 뚫지 않도록 충돌 감지 후 복원
         if hasattr(self, 'obj_names') and hasattr(self, 'obj_xyzs'):
