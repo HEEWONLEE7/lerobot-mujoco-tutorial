@@ -295,10 +295,10 @@
     <position name="actuator_arm_r_joint6" joint="arm_r_joint6" class="robot" ctrlrange="-1.57 1.57"/>
     <position name="actuator_arm_r_joint7" joint="arm_r_joint7" class="robot" ctrlrange="-1.046 1.046"/>
 
-    <position name="actuator_gripper_r_joint1" joint="gripper_r_joint1" ctrlrange="0.000 1.100" class="gripper"/>
-    <position name="actuator_gripper_r_joint2" joint="gripper_r_joint2" ctrlrange="0.000 1.000" class="gripper"/>
-    <position name="actuator_gripper_r_joint3" joint="gripper_r_joint3" ctrlrange="0.000 1.100" class="gripper"/>
-    <position name="actuator_gripper_r_joint4" joint="gripper_r_joint4" ctrlrange="0.000 1.000" class="gripper"/>
+    <position name="actuator_gripper_r_joint1" joint="gripper_r_joint1" ctrlrange="0.000 1.100" class="gripper" kp="500"/>
+    <position name="actuator_gripper_r_joint2" joint="gripper_r_joint2" ctrlrange="0.000 1.000" class="gripper" kp="500"/>
+    <position name="actuator_gripper_r_joint3" joint="gripper_r_joint3" ctrlrange="0.000 1.100" class="gripper" kp="500"/>
+    <position name="actuator_gripper_r_joint4" joint="gripper_r_joint4" ctrlrange="0.000 1.000" class="gripper" kp="500"/>
 
     <!--
       Left arm joints:
@@ -318,10 +318,10 @@
     <position name="actuator_arm_l_joint6" joint="arm_l_joint6" class="robot" ctrlrange="-1.57 1.57"/>
     <position name="actuator_arm_l_joint7" joint="arm_l_joint7" class="robot" ctrlrange="-1.046 1.046"/>
 
-    <position name="actuator_gripper_l_joint1" joint="gripper_l_joint1" ctrlrange="0.000 1.100" class="gripper"/>
-    <position name="actuator_gripper_l_joint2" joint="gripper_l_joint2" ctrlrange="0.000 1.000" class="gripper"/>
-    <position name="actuator_gripper_l_joint3" joint="gripper_l_joint3" ctrlrange="0.000 1.100" class="gripper"/>
-    <position name="actuator_gripper_l_joint4" joint="gripper_l_joint4" ctrlrange="0.000 1.000" class="gripper"/>
+    <position name="actuator_gripper_l_joint1" joint="gripper_l_joint1" ctrlrange="0.000 1.100" class="gripper" kp="500"/>
+    <position name="actuator_gripper_l_joint2" joint="gripper_l_joint2" ctrlrange="0.000 1.000" class="gripper" kp="500"/>
+    <position name="actuator_gripper_l_joint3" joint="gripper_l_joint3" ctrlrange="0.000 1.100" class="gripper" kp="500"/>
+    <position name="actuator_gripper_l_joint4" joint="gripper_l_joint4" ctrlrange="0.000 1.000" class="gripper" kp="500"/>
 
   </actuator>
 </mujoco>
