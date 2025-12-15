@@ -111,10 +111,9 @@ class SimpleEnv:
         
         # ✅ 물체를 더 높게 배치 (테이블 위 안전 마진)
         for obj_idx in range(n_obj):
-            safe_xyz = obj_xyzs[obj_idx,:].copy()
-            safe_xyz[2] = 0.835  # 0.82 → 0.835
-            self.env.set_p_base_body(body_name=obj_names[obj_idx], p=safe_xyz)
-            self.env.set_R_base_body(body_name=obj_names[obj_idx], R=np.eye(3,3))
+            self.env.set_p_base_body(body_name=obj_names[obj_idx],p=obj_xyzs[obj_idx,:])
+            self.env.set_R_base_body(body_name=obj_names[obj_idx],R=np.eye(3,3))
+        self.env.forward(increase_tick=False)
         
         # ✅ MuJoCo 물리 설정 개선
         self.env.model.opt.timestep = 0.002  # 타임스텝 감소 (더 정밀한 계산)
@@ -136,17 +135,7 @@ class SimpleEnv:
         
         mug_init_pose, plate_init_pose = self.get_obj_pose()
         self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
-        
-        # ✅ 안정화 루프: 더 적은 횟수로 효율적으로
-        for i in range(30):
-            # 물체를 계속 고정 (박히지 않도록)
-            # ❌ 초기화 중 강제 복원 제거: 접촉/물리 상호작용을 허용
-            # for obj_idx in range(n_obj):
-            #     safe_xyz = self.obj_xyzs[obj_idx,:].copy()
-            #     safe_xyz[2] = 0.835
-            #     self.env.set_p_base_body(body_name=self.obj_names[obj_idx], p=safe_xyz)
-            #     self.env.set_R_base_body(body_name=self.obj_names[obj_idx], R=np.eye(3,3))
-            
+        for _ in range(100):
             self.step_env()
         
         print("✓ INITIALIZATION COMPLETE")
@@ -434,7 +423,13 @@ class SimpleEnv:
 
         # 리셋
         if self.env.is_key_pressed_once(key=glfw.KEY_Z):
-            return np.zeros(8, dtype=np.float32), np.zeros(8, dtype=np.float32), True
+            # Always return 4 values to match caller expectations
+            return (
+                np.zeros(8, dtype=np.float32),
+                np.zeros(8, dtype=np.float32),
+                np.zeros(3, dtype=np.float32),
+                True,
+            )
 
         # 그리퍼 토글
         if self.env.is_key_pressed_once(key=glfw.KEY_SPACE):
