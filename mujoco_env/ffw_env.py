@@ -259,19 +259,19 @@ class SimpleEnv:
         '''
         Execute one physics step
         '''
-        q_full = np.concatenate([
-            self.q_l[:7],
-            self.q_l[7:],
-            self.q_r[:7],
-            self.q_r[7:],
-            self.q_extra
-        ])
+        # ✅ 1) lift/head는 직접 qpos 설정 (forward)
+        self.env.forward(q=self.q_extra, joint_names=self.joint_names_extra, increase_tick=False)
         
-        # ❌ 기존: 물리 건너뜀(텔레포트)
-        # self.env.forward(q=q_full, joint_names=self.all_joint_names, increase_tick=True)
-
-        # ✅ 수정: 물리 시뮬레이션 스텝 실행 (접촉/충돌 반응 활성화)
-        self.env.step(q_full, joint_names=self.all_joint_names)
+        # ✅ 2) arm/gripper는 기존 방식 (step으로 물리 계산)
+        q_arms = np.concatenate([
+            self.q_l[:7],    # left arm
+            self.q_l[7:],    # left gripper
+            self.q_r[:7],    # right arm
+            self.q_r[7:]     # right gripper
+        ])
+        arm_joint_names = self.joint_names_l + self.gripper_joints_l + self.joint_names_r + self.gripper_joints_r
+        
+        self.env.step(q_arms, joint_names=arm_joint_names)
 
     def grab_image(self):
         '''
@@ -417,21 +417,20 @@ class SimpleEnv:
         if self.env.is_key_pressed_repeat(key=glfw.KEY_E):
             drot = rotation_matrix(angle=-0.03, direction=[0.0, 1.0, 0.0])[:3, :3]
 
-        # ✅ LIFT 제어 (V/B) - 키보드 입력으로만 변경
         if self.env.is_key_pressed_repeat(key=glfw.KEY_V):
-            d_lift += 0.005
+            d_lift = 0.005
         if self.env.is_key_pressed_repeat(key=glfw.KEY_B):
-            d_lift += -0.005
+            d_lift = -0.005
 
         # ✅ HEAD 제어 (N/M + ,/.)
         if self.env.is_key_pressed_repeat(key=glfw.KEY_N):
-            d_head1 += -0.02
+            d_head1 = -0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_M):
-            d_head1 += 0.02
+            d_head1 = 0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_COMMA):
-            d_head2 += -0.02
+            d_head2 = -0.02
         if self.env.is_key_pressed_repeat(key=glfw.KEY_PERIOD):
-            d_head2 += 0.02
+            d_head2 = 0.02
 
         # 리셋
         if self.env.is_key_pressed_once(key=glfw.KEY_Z):
