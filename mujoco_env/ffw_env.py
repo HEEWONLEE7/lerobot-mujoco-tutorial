@@ -55,6 +55,9 @@ class SimpleEnv:
         # ✅ 모든 관절 이름을 순서대로 저장 (step_env에서 사용)
         self.all_joint_names = self.joint_names_l + self.gripper_joints_l + self.joint_names_r + self.gripper_joints_r + self.joint_names_extra
         
+        # Attach/detach state (no longer used, but keep for compatibility)
+        self.attached = False
+        self.last_gripper_l_state = False
         self.init_viewer()
         self.reset(seed)
 
@@ -143,6 +146,9 @@ class SimpleEnv:
         print("✓ INITIALIZATION COMPLETE")
         self.gripper_l = False
         self.gripper_r = False
+        # Reset attach state (for compatibility, but not used)
+        self.attached = False
+        self.last_gripper_l_state = False
 
     def step(self, action_l, action_r):
         '''
@@ -263,6 +269,8 @@ class SimpleEnv:
         arm_joint_names = self.joint_names_l + self.gripper_joints_l + self.joint_names_r + self.gripper_joints_r
         
         self.env.step(q_arms, joint_names=arm_joint_names)
+        
+        # 가상 attach/detach 로직 완전 제거: 오직 물리 엔진에만 의존
 
     def grab_image(self):
         '''
