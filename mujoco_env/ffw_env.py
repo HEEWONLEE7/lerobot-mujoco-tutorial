@@ -71,6 +71,7 @@ class SimpleEnv:
             use_rgb_overlay = False,
             loc_rgb_overlay = 'top right',
         )
+
     def reset(self, seed = None):
         '''
         Reset the environment
@@ -98,8 +99,8 @@ class SimpleEnv:
         n_obj = len(obj_names)
         obj_xyzs = sample_xyzs(
             n_obj,
-            x_range   = [+0.24,+0.4],
-            y_range   = [-0.2,+0.2],
+            x_range   = [+0.24,+0.7],
+            y_range   = [0.0,+0.5],
             z_range   = [0.82,0.82],
             min_dist  = 0.2,
             xy_margin = 0.0
@@ -114,6 +115,7 @@ class SimpleEnv:
             self.env.set_p_base_body(body_name=obj_names[obj_idx],p=obj_xyzs[obj_idx,:])
             self.env.set_R_base_body(body_name=obj_names[obj_idx],R=np.eye(3,3))
         self.env.forward(increase_tick=False)
+
         
         # ✅ MuJoCo 물리 설정 개선
         self.env.model.opt.timestep = 0.002  # 타임스텝 감소 (더 정밀한 계산)
@@ -133,8 +135,8 @@ class SimpleEnv:
         self.p0_l, self.R0_l = self.env.get_pR_body(body_name='tcp_l_link')
         self.p0_r, self.R0_r = self.env.get_pR_body(body_name='tcp_r_link')
         
-        mug_init_pose, plate_init_pose = self.get_obj_pose()
-        self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
+        cylinder_init_pose, plate_init_pose = self.get_obj_pose()
+        self.obj_init_pose = np.concatenate([cylinder_init_pose, plate_init_pose],dtype=np.float32)
         for _ in range(100):
             self.step_env()
         
@@ -483,12 +485,12 @@ class SimpleEnv:
 
     def check_success(self):
         '''
-        Check if the mug is placed on the plate
+        Check if the cylinder is placed on the plate
         + Gripper should be open and move upward above 0.9
         '''
-        p_mug = self.env.get_p_body('body_obj_mug_5')
+        p_cylinder = self.env.get_p_body('body_obj_cylinder')
         p_plate = self.env.get_p_body('body_obj_plate_11')
-        if np.linalg.norm(p_mug[:2] - p_plate[:2]) < 0.1 and np.linalg.norm(p_mug[2] - p_plate[2]) < 0.6 and self.env.get_qpos_joint('gripper_l_joint1') < 0.1:
+        if np.linalg.norm(p_cylinder[:2] - p_plate[:2]) < 0.1 and np.linalg.norm(p_cylinder[2] - p_plate[2]) < 0.6 and self.env.get_qpos_joint('gripper_l_joint1') < 0.1:
             p = self.env.get_p_body('tcp_l_link')[2]
             if p > 0.9:
                 return True
@@ -497,22 +499,22 @@ class SimpleEnv:
     def get_obj_pose(self):
         '''
         returns: 
-            p_mug: np.array, position of the mug
+            p_cylinder: np.array, position of the cylinder
             p_plate: np.array, position of the plate
         '''
-        p_mug = self.env.get_p_body('body_obj_mug_5')
+        p_cylinder = self.env.get_p_body('body_obj_cylinder')
         p_plate = self.env.get_p_body('body_obj_plate_11')
-        return p_mug, p_plate
+        return p_cylinder, p_plate
     
-    def set_obj_pose(self, p_mug, p_plate):
+    def set_obj_pose(self, p_cylinder, p_plate):
         '''
         Set the object poses
         args:
-            p_mug: np.array, position of the mug
+            p_cylinder: np.array, position of the cylinder
             p_plate: np.array, position of the plate
         '''
-        self.env.set_p_base_body(body_name='body_obj_mug_5',p=p_mug)
-        self.env.set_R_base_body(body_name='body_obj_mug_5',R=np.eye(3,3))
+        self.env.set_p_base_body(body_name='body_obj_cylinder',p=p_cylinder)
+        self.env.set_R_base_body(body_name='body_obj_cylinder',R=np.eye(3,3))
         self.env.set_p_base_body(body_name='body_obj_plate_11',p=p_plate)
         self.env.set_R_base_body(body_name='body_obj_plate_11',R=np.eye(3,3))
         self.step_env()
