@@ -19,8 +19,8 @@
 
     <!-- Hand (gripper) default -->
     <default class="gripper">
-      <joint armature="0.1" damping="5.0"/>
-      <position kp="300" forcerange="-1.0 1.0"/>
+      <joint armature="0.1" damping="10.0"/>
+      <position kp="1000" forcerange="-100 100"/>
     </default>
 
     <!-- Slider default (for the lift_joint) -->
@@ -138,23 +138,22 @@
                     <body name="gripper_l_rh_p12_rn_r1" pos="0 0.008 -0.126" quat="0 0 1 0">
                       <inertial pos="0 0.034 0.004" mass="0.068" diaginertia="1e-06 1e-06 1e-06"/>
                       <joint name="gripper_l_joint1" class="gripper" pos="0 0 0" axis="1 0 0" range="0 1.1"/>
-                          <geom type="mesh" mesh="r1" friction="1.0 0.3 0.1" solimp="0.998 0.998 0.001" solref="0.001 1" condim="3" contype="1" conaffinity="1" mass="0.068" density="0"/>
+                        <geom type="mesh" mesh="r1"/>
                       <body name="gripper_l_rh_p12_rn_r2" pos="0 0.0493634 0.0285">
                         <inertial pos="0 0.006 0.011" mass="0.022" diaginertia="1e-06 1e-06 1e-06"/>
                         <joint name="gripper_l_joint2" class="gripper" pos="0 0 0" axis="-1 0 0" range="0 1"/>
-                        <geom type="mesh" mesh="r2" friction="1.0 0.3 0.1" solimp="0.998 0.998 0.001" solref="0.001 1" condim="3" contype="1" conaffinity="1" mass="0.022" density="0"/>
-
+                        <geom type="mesh" mesh="r2"/>
 
                       </body>
                     </body>
                     <body name="gripper_l_rh_p12_rn_l1" pos="0 -0.008 -0.126" quat="0 0 1 0">
                       <inertial pos="0 -0.034 0.004" mass="0.068" diaginertia="1e-06 1e-06 1e-06"/>
                       <joint name="gripper_l_joint3" class="gripper" pos="0 0 0" axis="-1 0 0" range="0 1.1"/>
-                          <geom type="mesh" mesh="l1" friction="1.0 0.3 0.1" solimp="0.998 0.998 0.001" solref="0.001 1" condim="3" contype="1" conaffinity="1" mass="0.068" density="0"/>
+                        <geom type="mesh" mesh="l1"/>
                       <body name="gripper_l_rh_p12_rn_l2" pos="0 -0.0493634 0.0285">
                         <inertial pos="0 -0.006 0.011" mass="0.022" diaginertia="1e-06 1e-06 1e-06"/>
                         <joint name="gripper_l_joint4" class="gripper" pos="0 0 0" axis="1 0 0" range="0 1"/>
-                        <geom type="mesh" mesh="l2" friction="1.0 0.3 0.1" solimp="0.998 0.998 0.001" solref="0.001 1" condim="3" contype="1" conaffinity="1" mass="0.022" density="0"/>
+                        <geom type="mesh" mesh="l2"/>
                       </body>
                     </body>
                   </body>
@@ -221,25 +220,21 @@
                     <body name="gripper_r_rh_p12_rn_r1" pos="0 0.008 -0.126" quat="0 0 1 0">
                       <inertial pos="0 0.034 0.004" mass="0.068" diaginertia="1e-06 1e-06 1e-06"/>
                       <joint name="gripper_r_joint1" class="gripper" pos="0 0 0" axis="1 0 0" range="0 1.1"/>
-                          <geom type="mesh" rgba="0.2 0.2 0.2 1" mesh="r1"
-                            friction="1.0 0.3 0.1" solimp="0.998 0.998 0.001" solref="0.001 1" condim="3" contype="1" conaffinity="1" mass="0.068" density="0"/>
+                      <geom type="mesh" mesh="r1"/> 
                       <body name="gripper_r_rh_p12_rn_r2" pos="0 0.0493634 0.0285">
                         <inertial pos="0 0.006 0.011" mass="0.022" diaginertia="1e-06 1e-06 1e-06"/>
                         <joint name="gripper_r_joint2" class="gripper" pos="0 0 0" axis="-1 0 0" range="0 1"/>
-                        <geom type="mesh" rgba="0.2 0.2 0.2 1" mesh="r2"
-                          friction="1.0 0.3 0.1" solimp="0.998 0.998 0.001" solref="0.001 1" condim="3" contype="1" conaffinity="1" mass="0.022" density="0"/>
+                        <geom type="mesh" mesh="r2"/>
                       </body>
                     </body>
                     <body name="gripper_r_rh_p12_rn_l1" pos="0 -0.008 -0.126" quat="0 0 1 0">
                       <inertial pos="0 -0.034 0.004" mass="0.068" diaginertia="1e-06 1e-06 1e-06"/>
                       <joint name="gripper_r_joint3" class="gripper" pos="0 0 0" axis="-1 0 0" range="0 1.1"/>
-                          <geom type="mesh" rgba="0.2 0.2 0.2 1" mesh="l1"
-                            friction="1.0 0.3 0.1" solimp="0.998 0.998 0.001" solref="0.001 1" condim="3" contype="1" conaffinity="1" mass="0.068" density="0"/>
+                      <geom type="mesh" mesh="l2"/>
                       <body name="gripper_r_rh_p12_rn_l2" pos="0 -0.0493634 0.0285">
                         <inertial pos="0 -0.006 0.011" mass="0.022" diaginertia="1e-06 1e-06 1e-06"/>
                         <joint name="gripper_r_joint4" class="gripper" pos="0 0 0" axis="1 0 0" range="0 1"/>
-                        <geom type="mesh" rgba="0.2 0.2 0.2 1" mesh="l2"
-                          friction="1.0 0.3 0.1" solimp="0.998 0.998 0.001" solref="0.001 1" condim="3" contype="1" conaffinity="1" mass="0.022" density="0"/>
+                        <geom type="mesh" mesh="l2"/>
                       </body>
                     </body>
                   </body>
@@ -301,10 +296,10 @@
     <position name="actuator_arm_r_joint6" joint="arm_r_joint6" class="robot" ctrlrange="-1.57 1.57"/>
     <position name="actuator_arm_r_joint7" joint="arm_r_joint7" class="robot" ctrlrange="-1.046 1.046"/>
 
-    <position name="actuator_gripper_r_joint1" joint="gripper_r_joint1" ctrlrange="0.000 0.95" class="gripper" kp="300"/>
-    <position name="actuator_gripper_r_joint2" joint="gripper_r_joint2" ctrlrange="0.000 0.85" class="gripper" kp="300"/>
-    <position name="actuator_gripper_r_joint3" joint="gripper_r_joint3" ctrlrange="0.000 0.95" class="gripper" kp="300"/>
-    <position name="actuator_gripper_r_joint4" joint="gripper_r_joint4" ctrlrange="0.000 0.85" class="gripper" kp="300"/>
+    <position name="actuator_gripper_r_joint1" joint="gripper_r_joint1" ctrlrange="0.000 1.100" class="gripper" kp="500"/>
+    <position name="actuator_gripper_r_joint2" joint="gripper_r_joint2" ctrlrange="0.000 1.000" class="gripper" kp="500"/>
+    <position name="actuator_gripper_r_joint3" joint="gripper_r_joint3" ctrlrange="0.000 1.100" class="gripper" kp="500"/>
+    <position name="actuator_gripper_r_joint4" joint="gripper_r_joint4" ctrlrange="0.000 1.000" class="gripper" kp="500"/>
 
     <!--
       Left arm joints:
@@ -324,10 +319,10 @@
     <position name="actuator_arm_l_joint6" joint="arm_l_joint6" class="robot" ctrlrange="-1.57 1.57"/>
     <position name="actuator_arm_l_joint7" joint="arm_l_joint7" class="robot" ctrlrange="-1.046 1.046"/>
 
-    <position name="actuator_gripper_l_joint1" joint="gripper_l_joint1" ctrlrange="0.000 1.100" class="gripper"   />
-    <position name="actuator_gripper_l_joint2" joint="gripper_l_joint2" ctrlrange="0.000 1.000" class="gripper" kp="300"/>
-    <position name="actuator_gripper_l_joint3" joint="gripper_l_joint3" ctrlrange="0.000 1.100" class="gripper" kp="300"/>
-    <position name="actuator_gripper_l_joint4" joint="gripper_l_joint4" ctrlrange="0.000 1.000" class="gripper" kp="300"/>
+    <position name="actuator_gripper_l_joint1" joint="gripper_l_joint1" ctrlrange="0.000 1.100" class="gripper" kp="500"/>
+    <position name="actuator_gripper_l_joint2" joint="gripper_l_joint2" ctrlrange="0.000 1.000" class="gripper" kp="500"/>
+    <position name="actuator_gripper_l_joint3" joint="gripper_l_joint3" ctrlrange="0.000 1.100" class="gripper" kp="500"/>
+    <position name="actuator_gripper_l_joint4" joint="gripper_l_joint4" ctrlrange="0.000 1.000" class="gripper" kp="500"/>
 
   </actuator>
 </mujoco>

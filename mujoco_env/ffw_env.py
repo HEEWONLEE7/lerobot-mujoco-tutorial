@@ -75,78 +75,63 @@ class SimpleEnv:
             loc_rgb_overlay = 'top right',
         )
 
-    def reset(self, seed = None):
+    def reset(self, seed=None):
         '''
-        Reset the environment
-        Move the robot to a initial position, set the object positions based on the seed
+        Reset the environment (y_env style)
         '''
-        if seed != None: np.random.seed(seed=0) 
-        
-        print("Left arm joints:", self.joint_names_l)
-        print("Right arm joints:", self.joint_names_r)
-        print("Extra joints:", self.joint_names_extra)
-        
-        q_init_l = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        q_init_r = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        q_init_extra = np.array([0.0, 0.0, 0.0])
-        
-        q_zero_l = q_init_l
-        q_zero_r = q_init_r
-        
-        self.env.forward(q=q_zero_l, joint_names=self.joint_names_l, increase_tick=False)
-        self.env.forward(q=q_zero_r, joint_names=self.joint_names_r, increase_tick=False)
+        if seed is not None:
+            np.random.seed(seed=0)
+
+        # Set initial joint positions
+        q_init_l = np.zeros(7)
+        q_init_r = np.zeros(7)
+        q_init_extra = np.zeros(3)
+
+        # Forward to initial pose
+        self.env.forward(q=q_init_l, joint_names=self.joint_names_l, increase_tick=False)
+        self.env.forward(q=q_init_r, joint_names=self.joint_names_r, increase_tick=False)
         self.env.forward(q=q_init_extra, joint_names=self.joint_names_extra, increase_tick=False)
 
-        # Set object positions
+        # Set object positions (sample, place, forward)
         obj_names = self.env.get_body_names(prefix='body_obj_')
         n_obj = len(obj_names)
         obj_xyzs = sample_xyzs(
             n_obj,
-            x_range   = [+0.24,+0.7],
-            y_range   = [0.0,+0.5],
-            z_range   = [0.82,0.82],
-            min_dist  = 0.2,
-            xy_margin = 0.0
+            x_range=[+0.24, +0.7],
+            y_range=[0.0, +0.5],
+            z_range=[0.82, 0.82],
+            min_dist=0.2,
+            xy_margin=0.0
         )
-        
-        # ✅ 물체 위치 저장
         self.obj_names = obj_names
         self.obj_xyzs = obj_xyzs
-        
-        # ✅ 물체를 더 높게 배치 (테이블 위 안전 마진)
         for obj_idx in range(n_obj):
-            self.env.set_p_base_body(body_name=obj_names[obj_idx],p=obj_xyzs[obj_idx,:])
-            self.env.set_R_base_body(body_name=obj_names[obj_idx],R=np.eye(3,3))
+            self.env.set_p_base_body(body_name=obj_names[obj_idx], p=obj_xyzs[obj_idx, :])
+            self.env.set_R_base_body(body_name=obj_names[obj_idx], R=np.eye(3, 3))
         self.env.forward(increase_tick=False)
 
-        
-        # ✅ MuJoCo 물리 설정 개선
-        self.env.model.opt.timestep = 0.002  # 타임스텝 감소 (더 정밀한 계산)
-        self.env.model.opt.iterations = 50   # 반복 횟수 증가 (정확성 향상)
-        
+        # Physics options
+        self.env.model.opt.timestep = 0.002
+        self.env.model.opt.iterations = 50
         self.env.forward(increase_tick=False)
 
-        # Set the initial pose of the robot
-        self.last_q_l = copy.deepcopy(q_zero_l)
-        self.last_q_r = copy.deepcopy(q_zero_r)
+        # Set initial pose and state
+        self.last_q_l = copy.deepcopy(q_init_l)
+        self.last_q_r = copy.deepcopy(q_init_r)
         self.last_q_extra = copy.deepcopy(q_init_extra)
-        
-        self.q_l = np.concatenate([q_zero_l, np.array([0.0]*4)])
-        self.q_r = np.concatenate([q_zero_r, np.array([0.0]*4)])
+        self.q_l = np.concatenate([q_init_l, np.zeros(4)])
+        self.q_r = np.concatenate([q_init_r, np.zeros(4)])
         self.q_extra = q_init_extra
-        
         self.p0_l, self.R0_l = self.env.get_pR_body(body_name='tcp_l_link')
         self.p0_r, self.R0_r = self.env.get_pR_body(body_name='tcp_r_link')
-        
-        cylinder_init_pose, plate_init_pose = self.get_obj_pose()
-        self.obj_init_pose = np.concatenate([cylinder_init_pose, plate_init_pose],dtype=np.float32)
+        mug_5_init_pose, plate_init_pose = self.get_obj_pose()
+        self.obj_init_pose = np.concatenate([mug_5_init_pose, plate_init_pose], dtype=np.float32)
         for _ in range(100):
-            self.step_env()
-        
+            self.env.step(np.concatenate([self.q_l[:7], self.q_l[7:], self.q_r[:7], self.q_r[7:]]),
+                          joint_names=self.joint_names_l + self.gripper_joints_l + self.joint_names_r + self.gripper_joints_r)
         print("✓ INITIALIZATION COMPLETE")
         self.gripper_l = False
         self.gripper_r = False
-        # Reset attach state (for compatibility, but not used)
         self.attached = False
         self.last_gripper_l_state = False
 
@@ -254,23 +239,16 @@ class SimpleEnv:
 
     def step_env(self):
         '''
-        Execute one physics step
+        Execute one physics step (y_env style)
         '''
-        # ✅ 1) lift/head는 직접 qpos 설정 (forward)
+        # Update extra joints (lift/head)
         self.env.forward(q=self.q_extra, joint_names=self.joint_names_extra, increase_tick=False)
-        
-        # ✅ 2) arm/gripper는 기존 방식 (step으로 물리 계산)
+        # Update arms and grippers in one step
         q_arms = np.concatenate([
-            self.q_l[:7],    # left arm
-            self.q_l[7:],    # left gripper
-            self.q_r[:7],    # right arm
-            self.q_r[7:]     # right gripper
+            self.q_l[:7], self.q_l[7:], self.q_r[:7], self.q_r[7:]
         ])
         arm_joint_names = self.joint_names_l + self.gripper_joints_l + self.joint_names_r + self.gripper_joints_r
-        
         self.env.step(q_arms, joint_names=arm_joint_names)
-        
-        # 가상 attach/detach 로직 완전 제거: 오직 물리 엔진에만 의존
 
     def grab_image(self):
         '''
@@ -355,9 +333,9 @@ class SimpleEnv:
 
     def get_joint_state(self):
         '''
-        Get the joint state of both arms
-        returns:
-            state_l, state_r: joint angles + gripper state
+        Get the joint state of both arms (joint angles + gripper state) (y_env style)
+        Returns:
+            state_l, state_r: np.array, [joints..., gripper]
         '''
         qpos_l = self.env.get_qpos_joints(joint_names=self.joint_names_l)
         qpos_r = self.env.get_qpos_joints(joint_names=self.joint_names_r)
@@ -365,7 +343,7 @@ class SimpleEnv:
         gripper_r = self.env.get_qpos_joint('gripper_r_joint1')
         gripper_cmd_l = 1.0 if gripper_l[0] > 0.5 else 0.0
         gripper_cmd_r = 1.0 if gripper_r[0] > 0.5 else 0.0
-        return np.concatenate([qpos_l, [gripper_cmd_l]],dtype=np.float32), np.concatenate([qpos_r, [gripper_cmd_r]],dtype=np.float32)
+        return np.concatenate([qpos_l, [gripper_cmd_l]], dtype=np.float32), np.concatenate([qpos_r, [gripper_cmd_r]], dtype=np.float32)
     
     def teleop_robot(self):
         '''
@@ -389,9 +367,9 @@ class SimpleEnv:
         d_head2 = 0.0
 
         # ARM 움직임 (시청자 기준)
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_W):  # 위쪽 (y+)
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_S):  # 위쪽 (y+)
             dpos += np.array([0.007, 0.0, 0.0])
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_S):  # 아래쪽 (y-)
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_W):  # 아래쪽 (y-)
             dpos += np.array([-0.007, 0.0, 0.0])
         if self.env.is_key_pressed_repeat(key=glfw.KEY_A):  # 왼쪽 (x-)
             dpos += np.array([0.0, -0.007, 0.0])
@@ -403,9 +381,9 @@ class SimpleEnv:
             dpos += np.array([0.0, 0.0, -0.007])
 
         # ARM 회전 (화살표 + QE)
-        if self.env.is_key_pressed_repeat(key=glfw.KEY_LEFT):
-            drot = rotation_matrix(angle=0.03, direction=[0.0, 0.0, 1.0])[:3, :3]
         if self.env.is_key_pressed_repeat(key=glfw.KEY_RIGHT):
+            drot = rotation_matrix(angle=0.03, direction=[0.0, 0.0, 1.0])[:3, :3]
+        if self.env.is_key_pressed_repeat(key=glfw.KEY_LEFT):
             drot = rotation_matrix(angle=-0.03, direction=[0.0, 0.0, 1.0])[:3, :3]
         if self.env.is_key_pressed_repeat(key=glfw.KEY_UP):
             drot = rotation_matrix(angle=0.03, direction=[1.0, 0.0, 0.0])[:3, :3]
@@ -493,12 +471,13 @@ class SimpleEnv:
 
     def check_success(self):
         '''
-        Check if the cylinder is placed on the plate
+        Check if the mug_5 is placed on the plate
         + Gripper should be open and move upward above 0.9
         '''
-        p_cylinder = self.env.get_p_body('body_obj_cylinder')
+        p_mug_5 = self.env.get_p_body('body_obj_mug_5')
         p_plate = self.env.get_p_body('body_obj_plate_11')
-        if np.linalg.norm(p_cylinder[:2] - p_plate[:2]) < 0.1 and np.linalg.norm(p_cylinder[2] - p_plate[2]) < 0.6 and self.env.get_qpos_joint('gripper_l_joint1') < 0.1:
+        gripper_l = self.env.get_qpos_joint('gripper_l_joint1')
+        if np.linalg.norm(p_mug_5[:2] - p_plate[:2]) < 0.1 and np.linalg.norm(p_mug_5[2] - p_plate[2]) < 0.6 and gripper_l[0] < 0.1:
             p = self.env.get_p_body('tcp_l_link')[2]
             if p > 0.9:
                 return True
@@ -507,22 +486,22 @@ class SimpleEnv:
     def get_obj_pose(self):
         '''
         returns: 
-            p_cylinder: np.array, position of the cylinder
+            p_mug_5: np.array, position of the mug_5
             p_plate: np.array, position of the plate
         '''
-        p_cylinder = self.env.get_p_body('body_obj_cylinder')
+        p_mug_5 = self.env.get_p_body('body_obj_mug_5')
         p_plate = self.env.get_p_body('body_obj_plate_11')
-        return p_cylinder, p_plate
+        return p_mug_5, p_plate
     
-    def set_obj_pose(self, p_cylinder, p_plate):
+    def set_obj_pose(self, p_mug_5, p_plate):
         '''
         Set the object poses
         args:
-            p_cylinder: np.array, position of the cylinder
+            p_mug_5: np.array, position of the mug_5
             p_plate: np.array, position of the plate
         '''
-        self.env.set_p_base_body(body_name='body_obj_cylinder',p=p_cylinder)
-        self.env.set_R_base_body(body_name='body_obj_cylinder',R=np.eye(3,3))
+        self.env.set_p_base_body(body_name='body_obj_mug_5',p=p_mug_5)
+        self.env.set_R_base_body(body_name='body_obj_mug_5',R=np.eye(3,3))
         self.env.set_p_base_body(body_name='body_obj_plate_11',p=p_plate)
         self.env.set_R_base_body(body_name='body_obj_plate_11',R=np.eye(3,3))
         self.step_env()
